@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import RoleGuard from "../../components/RoleGuard";
 import DashboardHeader from "../../components/DashboardHeader";
 import {
   exportScanCsv,
-  fetchScanHistory,
   fetchScanHistoryFiltered
 } from "../../features/scans/scanService";
 import { useAuth } from "../../features/auth/AuthContext";
@@ -26,35 +25,14 @@ export default function ScansPage() {
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [isInteracting, setIsInteracting] = useState(false);
+  const interactionTimerRef = useRef<number | null>(null);
 
-  useEffect(() => {
+  const refreshScans = async () => {
     if (!token) {
       return;
     }
 
-    setLoading(true);
-    fetchScanHistory(token, limit)
-      .then((response) => {
-        setScans(response.scans);
-        setCursor(response.nextCursor ?? null);
-        setHasMore(Boolean(response.nextCursor));
-      })
-      .catch((err) => {
-        setError(err instanceof Error ? err.message : "Unable to load scan history");
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [token, limit]);
-
-  const applyFilters = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!token) {
-      return;
-    }
-
-    setCursor(null);
-    setHasMore(true);
     setLoading(true);
     setError(null);
 
@@ -77,6 +55,61 @@ export default function ScansPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+
+    refreshScans();
+  }, [token, limit]);
+
+  useEffect(() => {
+    const handleInteraction = () => {
+      setIsInteracting(true);
+      if (interactionTimerRef.current) {
+        window.clearTimeout(interactionTimerRef.current);
+      }
+      interactionTimerRef.current = window.setTimeout(() => {
+        setIsInteracting(false);
+      }, 4000);
+    };
+
+    const events = ["mousedown", "keydown", "scroll", "touchstart", "mousemove", "focusin"];
+    events.forEach((event) => window.addEventListener(event, handleInteraction, { passive: true }));
+
+    return () => {
+      events.forEach((event) => window.removeEventListener(event, handleInteraction));
+      if (interactionTimerRef.current) {
+        window.clearTimeout(interactionTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      if (!isInteracting && !loading && !exporting) {
+        refreshScans();
+      }
+    }, 15000);
+
+    return () => window.clearInterval(interval);
+  }, [token, isInteracting, loading, exporting, limit, result, actorRole, prescriptionId, from, to, query]);
+
+  const applyFilters = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!token) {
+      return;
+    }
+
+    setCursor(null);
+    setHasMore(true);
+    await refreshScans();
   };
 
   const clearFilters = () => {
@@ -250,8 +283,13 @@ export default function ScansPage() {
             ) : null}
 
             <div className="mt-4 space-y-3">
-              {scans.map((scan) => (
-                <div key={scan.id} className="rounded-xl border border-slate-200 p-4">
+              {scans.map((scan, index) => (
+                <div
+                  key={scan.id}
+                  className={`rounded-xl border p-4 ${
+                    scan.result === "FAIL" ? "border-rose-200 bg-rose-50/40" : "border-slate-200"
+                  } ${index === 0 ? "ring-1 ring-emerald-200" : ""}`}
+                >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <p className="text-sm font-semibold text-slate-900">{scan.reason ?? "Scan"}</p>
@@ -269,6 +307,11 @@ export default function ScansPage() {
                       >
                         {scan.result}
                       </span>
+                      {index === 0 ? (
+                        <span className="rounded-full bg-emerald-100 px-3 py-1 text-[10px] font-semibold text-emerald-700">
+                          Latest
+                        </span>
+                      ) : null}
                       <span
                         className={`rounded-full px-3 py-1 text-xs ${
                           scan.actorRole === "DOCTOR"

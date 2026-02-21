@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import RoleGuard from "../../components/RoleGuard";
 import DashboardHeader from "../../components/DashboardHeader";
 import { useAuth } from "../../features/auth/AuthContext";
-import { exportAuditCsv, fetchAuditLogs, fetchAuditLogsFiltered } from "../../features/audit/auditService";
+import { exportAuditCsv, fetchAuditLogsFiltered } from "../../features/audit/auditService";
 import type { AuditLog } from "../../features/audit/types";
 
 export default function AuditPage() {
@@ -22,35 +22,14 @@ export default function AuditPage() {
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [isInteracting, setIsInteracting] = useState(false);
+  const interactionTimerRef = useRef<number | null>(null);
 
-  useEffect(() => {
+  const refreshLogs = async () => {
     if (!token) {
       return;
     }
 
-    setLoading(true);
-    fetchAuditLogs(token, limit)
-      .then((response) => {
-        setLogs(response.logs);
-        setCursor(response.nextCursor ?? null);
-        setHasMore(Boolean(response.nextCursor));
-      })
-      .catch((err) => {
-        setError(err instanceof Error ? err.message : "Unable to load audit logs");
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [token, limit]);
-
-  const applyFilters = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!token) {
-      return;
-    }
-
-    setCursor(null);
-    setHasMore(true);
     setLoading(true);
     setError(null);
 
@@ -73,6 +52,61 @@ export default function AuditPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+
+    refreshLogs();
+  }, [token, limit]);
+
+  useEffect(() => {
+    const handleInteraction = () => {
+      setIsInteracting(true);
+      if (interactionTimerRef.current) {
+        window.clearTimeout(interactionTimerRef.current);
+      }
+      interactionTimerRef.current = window.setTimeout(() => {
+        setIsInteracting(false);
+      }, 4000);
+    };
+
+    const events = ["mousedown", "keydown", "scroll", "touchstart", "mousemove", "focusin"];
+    events.forEach((event) => window.addEventListener(event, handleInteraction, { passive: true }));
+
+    return () => {
+      events.forEach((event) => window.removeEventListener(event, handleInteraction));
+      if (interactionTimerRef.current) {
+        window.clearTimeout(interactionTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      if (!isInteracting && !loading && !exporting) {
+        refreshLogs();
+      }
+    }, 15000);
+
+    return () => window.clearInterval(interval);
+  }, [token, isInteracting, loading, exporting, limit, action, actorRole, prescriptionId, from, to, query]);
+
+  const applyFilters = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!token) {
+      return;
+    }
+
+    setCursor(null);
+    setHasMore(true);
+    await refreshLogs();
   };
 
   const clearFilters = () => {
@@ -243,8 +277,13 @@ export default function AuditPage() {
             ) : null}
 
             <div className="mt-4 space-y-3">
-              {logs.map((log) => (
-                <div key={log.id} className="rounded-xl border border-slate-200 p-4">
+              {logs.map((log, index) => (
+                <div
+                  key={log.id}
+                  className={`rounded-xl border p-4 ${
+                    index === 0 ? "border-emerald-200 bg-emerald-50/40" : "border-slate-200"
+                  }`}
+                >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <p className="text-sm font-semibold text-slate-900">{log.action}</p>
@@ -265,6 +304,11 @@ export default function AuditPage() {
                     >
                       {log.actorRole}
                     </span>
+                    {index === 0 ? (
+                      <span className="rounded-full bg-emerald-100 px-3 py-1 text-[10px] font-semibold text-emerald-700">
+                        Latest
+                      </span>
+                    ) : null}
                   </div>
                   <p className="mt-2 text-sm text-slate-700">{log.details ?? "No details"}</p>
                   <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">

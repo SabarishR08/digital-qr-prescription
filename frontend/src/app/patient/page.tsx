@@ -7,7 +7,7 @@ import QrScanner from "../../components/QrScanner";
 import { useAuth } from "../../features/auth/AuthContext";
 import { verifyPrescription } from "../../features/prescriptions/prescriptionService";
 import type { Prescription } from "../../features/prescriptions/types";
-import { fetchScanHistory } from "../../features/scans/scanService";
+import { exportScanCsv, fetchScanHistory } from "../../features/scans/scanService";
 import type { ScanLog } from "../../features/scans/types";
 
 export default function PatientPage() {
@@ -19,6 +19,7 @@ export default function PatientPage() {
   const [scanHistory, setScanHistory] = useState<ScanLog[]>([]);
   const [scanLoading, setScanLoading] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [scanExporting, setScanExporting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [lastScan, setLastScan] = useState<string | null>(null);
 
@@ -45,6 +46,28 @@ export default function PatientPage() {
       setScanError(err instanceof Error ? err.message : "Unable to load scan history");
     } finally {
       setScanLoading(false);
+    }
+  };
+
+  const downloadScanCsv = async () => {
+    if (!token) {
+      return;
+    }
+
+    setScanExporting(true);
+    try {
+      const blob = await exportScanCsv(token, {});
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      const stamp = new Date().toISOString().slice(0, 10);
+      anchor.href = url;
+      anchor.download = `scan-history-${stamp}.csv`;
+      anchor.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setScanError(err instanceof Error ? err.message : "Unable to export scan history");
+    } finally {
+      setScanExporting(false);
     }
   };
 
@@ -138,10 +161,25 @@ export default function PatientPage() {
             ) : null}
             {!scanLoading && scanHistory.length ? (
               <div className="mt-4 text-xs text-slate-600">
-                Recent scans:
+                <div className="flex items-center justify-between">
+                  <span>Recent scans:</span>
+                  <button
+                    className="rounded-md border border-slate-200 px-2 py-1 text-[10px]"
+                    type="button"
+                    onClick={downloadScanCsv}
+                    disabled={scanExporting}
+                  >
+                    {scanExporting ? "Exporting..." : "Export CSV"}
+                  </button>
+                </div>
                 <div className="mt-2 space-y-2">
-                  {scanHistory.map((scan) => (
-                    <div key={scan.id} className="rounded-md bg-slate-50 px-2 py-1">
+                  {scanHistory.map((scan, index) => (
+                    <div
+                      key={scan.id}
+                      className={`rounded-md px-2 py-1 ${
+                        scan.result === "FAIL" ? "bg-rose-50" : "bg-slate-50"
+                      } ${index === 0 ? "ring-1 ring-emerald-200" : ""}`}
+                    >
                       <div className="flex items-center justify-between gap-2">
                         <span
                           className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
@@ -152,6 +190,11 @@ export default function PatientPage() {
                         >
                           {scan.result}
                         </span>
+                        {index === 0 ? (
+                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                            Latest
+                          </span>
+                        ) : null}
                         <span className="text-[10px] text-slate-500">
                           {new Date(scan.createdAt).toLocaleString()}
                         </span>
