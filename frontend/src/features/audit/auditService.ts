@@ -128,3 +128,42 @@ export async function exportAuditCsv(token: string, filters: AuditFilters) {
 
   return response.blob();
 }
+
+export async function exportAuditJson(token: string, filters: AuditFilters) {
+  const params = new URLSearchParams();
+  if (filters.action) {
+    params.set("action", filters.action);
+  }
+  if (filters.actorRole) {
+    params.set("actorRole", filters.actorRole);
+  }
+  if (filters.prescriptionId) {
+    params.set("prescriptionId", filters.prescriptionId);
+  }
+  if (filters.from) {
+    params.set("from", filters.from);
+  }
+  if (filters.to) {
+    params.set("to", filters.to);
+  }
+  if (filters.q) {
+    params.set("q", filters.q);
+  }
+  params.set("format", "json");
+
+  const response = await fetch(`${API_BASE}/audit/export?${params.toString()}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`
+    },
+    credentials: "include"
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    const message = body?.error ?? "Request failed";
+    throw new Error(message);
+  }
+
+  return response.blob();
+}

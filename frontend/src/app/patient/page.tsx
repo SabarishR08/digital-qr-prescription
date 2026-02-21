@@ -7,7 +7,7 @@ import QrScanner from "../../components/QrScanner";
 import { useAuth } from "../../features/auth/AuthContext";
 import { verifyPrescription } from "../../features/prescriptions/prescriptionService";
 import type { Prescription } from "../../features/prescriptions/types";
-import { exportScanCsv, fetchScanHistory } from "../../features/scans/scanService";
+import { exportScanCsv, exportScanJson, fetchScanHistory } from "../../features/scans/scanService";
 import type { ScanLog } from "../../features/scans/types";
 
 export default function PatientPage() {
@@ -62,6 +62,28 @@ export default function PatientPage() {
       const stamp = new Date().toISOString().slice(0, 10);
       anchor.href = url;
       anchor.download = `scan-history-${stamp}.csv`;
+      anchor.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setScanError(err instanceof Error ? err.message : "Unable to export scan history");
+    } finally {
+      setScanExporting(false);
+    }
+  };
+
+  const downloadScanJson = async () => {
+    if (!token) {
+      return;
+    }
+
+    setScanExporting(true);
+    try {
+      const blob = await exportScanJson(token, {});
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      const stamp = new Date().toISOString().slice(0, 10);
+      anchor.href = url;
+      anchor.download = `scan-history-${stamp}.json`;
       anchor.click();
       window.URL.revokeObjectURL(url);
     } catch (err) {
@@ -163,14 +185,29 @@ export default function PatientPage() {
               <div className="mt-4 text-xs text-slate-600">
                 <div className="flex items-center justify-between">
                   <span>Recent scans:</span>
-                  <button
-                    className="rounded-md border border-slate-200 px-2 py-1 text-[10px]"
-                    type="button"
-                    onClick={downloadScanCsv}
-                    disabled={scanExporting}
-                  >
-                    {scanExporting ? "Exporting..." : "Export CSV"}
-                  </button>
+                  <details className="relative">
+                    <summary className="cursor-pointer rounded-md border border-slate-200 px-2 py-1 text-[10px]">
+                      {scanExporting ? "Exporting..." : "Export"}
+                    </summary>
+                    <div className="absolute right-0 z-10 mt-2 w-28 rounded-md border border-slate-200 bg-white p-1 shadow-md">
+                      <button
+                        className="w-full rounded-md px-2 py-1 text-left text-[11px] hover:bg-slate-50"
+                        type="button"
+                        onClick={downloadScanCsv}
+                        disabled={scanExporting}
+                      >
+                        CSV
+                      </button>
+                      <button
+                        className="w-full rounded-md px-2 py-1 text-left text-[11px] hover:bg-slate-50"
+                        type="button"
+                        onClick={downloadScanJson}
+                        disabled={scanExporting}
+                      >
+                        JSON
+                      </button>
+                    </div>
+                  </details>
                 </div>
                 <div className="mt-2 space-y-2">
                   {scanHistory.map((scan, index) => (

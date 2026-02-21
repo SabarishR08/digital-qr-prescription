@@ -163,6 +163,7 @@ export async function exportScanCsv(req: Request, res: Response) {
   }
 
   const { where: baseWhere, q } = buildScanFilters(req);
+  const format = req.query.format ? String(req.query.format).toLowerCase() : "csv";
   let where = baseWhere as Record<string, unknown>;
 
   if (q) {
@@ -202,6 +203,13 @@ export async function exportScanCsv(req: Request, res: Response) {
         actorId: req.user.sub
       }
     });
+  }
+
+  if (format === "json") {
+    const payload = JSON.stringify(scans);
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Content-Disposition", "attachment; filename=scan-history.json");
+    return res.send(payload);
   }
 
   const csv = scansToCsv(scans as Array<{ [key: string]: unknown }>);

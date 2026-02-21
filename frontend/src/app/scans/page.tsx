@@ -5,6 +5,7 @@ import RoleGuard from "../../components/RoleGuard";
 import DashboardHeader from "../../components/DashboardHeader";
 import {
   exportScanCsv,
+  exportScanJson,
   fetchScanHistoryFiltered
 } from "../../features/scans/scanService";
 import { useAuth } from "../../features/auth/AuthContext";
@@ -26,6 +27,8 @@ export default function ScansPage() {
   const [hasMore, setHasMore] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [isInteracting, setIsInteracting] = useState(false);
+  const [refreshEnabled, setRefreshEnabled] = useState(true);
+  const [refreshInterval, setRefreshInterval] = useState(15000);
   const interactionTimerRef = useRef<number | null>(null);
 
   const refreshScans = async () => {
@@ -92,14 +95,18 @@ export default function ScansPage() {
       return;
     }
 
+    if (!refreshEnabled) {
+      return;
+    }
+
     const interval = window.setInterval(() => {
       if (!isInteracting && !loading && !exporting) {
         refreshScans();
       }
-    }, 15000);
+    }, refreshInterval);
 
     return () => window.clearInterval(interval);
-  }, [token, isInteracting, loading, exporting, limit, result, actorRole, prescriptionId, from, to, query]);
+  }, [token, isInteracting, loading, exporting, refreshEnabled, refreshInterval, limit, result, actorRole, prescriptionId, from, to, query]);
 
   const applyFilters = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -148,6 +155,35 @@ export default function ScansPage() {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to export CSV");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const downloadJson = async () => {
+    if (!token) {
+      return;
+    }
+
+    setExporting(true);
+    try {
+      const blob = await exportScanJson(token, {
+        result: result || undefined,
+        actorRole: actorRole || undefined,
+        prescriptionId: prescriptionId.trim() || undefined,
+        from: from || undefined,
+        to: to || undefined,
+        q: query.trim() || undefined
+      });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      const stamp = new Date().toISOString().slice(0, 10);
+      anchor.href = url;
+      anchor.download = `scan-history-${stamp}.json`;
+      anchor.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to export JSON");
     } finally {
       setExporting(false);
     }
@@ -257,14 +293,49 @@ export default function ScansPage() {
                 >
                   Clear
                 </button>
-                <button
-                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
-                  type="button"
-                  onClick={downloadCsv}
-                  disabled={exporting}
-                >
-                  {exporting ? "Exporting..." : "Download CSV"}
-                </button>
+                <details className="relative">
+                  <summary className="cursor-pointer rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">
+                    {exporting ? "Exporting..." : "Export"}
+                  </summary>
+                  <div className="absolute right-0 z-10 mt-2 w-36 rounded-lg border border-slate-200 bg-white p-2 shadow-md">
+                    <button
+                      className="w-full rounded-md px-2 py-1 text-left text-sm hover:bg-slate-50"
+                      type="button"
+                      onClick={downloadCsv}
+                      disabled={exporting}
+                    >
+                      CSV
+                    </button>
+                    <button
+                      className="w-full rounded-md px-2 py-1 text-left text-sm hover:bg-slate-50"
+                      type="button"
+                      onClick={downloadJson}
+                      disabled={exporting}
+                    >
+                      JSON
+                    </button>
+                  </div>
+                </details>
+                <div className="ml-auto flex items-center gap-2 text-xs text-slate-500">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={refreshEnabled}
+                      onChange={(event) => setRefreshEnabled(event.target.checked)}
+                    />
+                    Auto-refresh
+                  </label>
+                  <select
+                    className="rounded-md border border-slate-200 px-2 py-1 text-xs"
+                    value={refreshInterval}
+                    onChange={(event) => setRefreshInterval(Number(event.target.value))}
+                    disabled={!refreshEnabled}
+                  >
+                    <option value={5000}>5s</option>
+                    <option value={15000}>15s</option>
+                    <option value={30000}>30s</option>
+                  </select>
+                </div>
               </div>
             </form>
 
@@ -372,6 +443,32 @@ export default function ScansPage() {
               </div>
             ) : null}
           </div>
+
+          {scans.length ? (
+            <div className="pointer-events-none fixed bottom-6 right-6 max-w-xs rounded-2xl border border-slate-200 bg-white p-4 shadow-lg">
+              <p className="text-xs uppercase tracking-wide text-slate-400">Latest scan</p>
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <span
+                  className={`rounded-full px-2 py-1 text-xs font-semibold ${
+                    scans[0].result === "SUCCESS"
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-rose-50 text-rose-700"
+                  }`}
+                >
+                  {scans[0].result}
+                </span>
+                <span className="text-[10px] text-slate-500">
+                  {new Date(scans[0].createdAt).toLocaleTimeString()}
+                </span>
+              </div>
+              <p className="mt-2 text-xs text-slate-600">
+                {scans[0].reason ?? "Scan"} · {scans[0].actorRole}
+              </p>
+              <p className="mt-1 truncate text-[11px] text-slate-500">
+                {scans[0].prescriptionId ?? "Unknown prescription"}
+              </p>
+            </div>
+          ) : null}
         </section>
       </main>
     </RoleGuard>

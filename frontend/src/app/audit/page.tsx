@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import RoleGuard from "../../components/RoleGuard";
 import DashboardHeader from "../../components/DashboardHeader";
 import { useAuth } from "../../features/auth/AuthContext";
-import { exportAuditCsv, fetchAuditLogsFiltered } from "../../features/audit/auditService";
+import { exportAuditCsv, exportAuditJson, fetchAuditLogsFiltered } from "../../features/audit/auditService";
 import type { AuditLog } from "../../features/audit/types";
 
 export default function AuditPage() {
@@ -23,6 +23,8 @@ export default function AuditPage() {
   const [hasMore, setHasMore] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [isInteracting, setIsInteracting] = useState(false);
+  const [refreshEnabled, setRefreshEnabled] = useState(true);
+  const [refreshInterval, setRefreshInterval] = useState(15000);
   const interactionTimerRef = useRef<number | null>(null);
 
   const refreshLogs = async () => {
@@ -89,14 +91,18 @@ export default function AuditPage() {
       return;
     }
 
+    if (!refreshEnabled) {
+      return;
+    }
+
     const interval = window.setInterval(() => {
       if (!isInteracting && !loading && !exporting) {
         refreshLogs();
       }
-    }, 15000);
+    }, refreshInterval);
 
     return () => window.clearInterval(interval);
-  }, [token, isInteracting, loading, exporting, limit, action, actorRole, prescriptionId, from, to, query]);
+  }, [token, isInteracting, loading, exporting, refreshEnabled, refreshInterval, limit, action, actorRole, prescriptionId, from, to, query]);
 
   const applyFilters = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -145,6 +151,35 @@ export default function AuditPage() {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to export CSV");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const downloadJson = async () => {
+    if (!token) {
+      return;
+    }
+
+    setExporting(true);
+    try {
+      const blob = await exportAuditJson(token, {
+        action: action.trim() || undefined,
+        actorRole: actorRole || undefined,
+        prescriptionId: prescriptionId.trim() || undefined,
+        from: from || undefined,
+        to: to || undefined,
+        q: query.trim() || undefined
+      });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      const stamp = new Date().toISOString().slice(0, 10);
+      anchor.href = url;
+      anchor.download = `audit-logs-${stamp}.json`;
+      anchor.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to export JSON");
     } finally {
       setExporting(false);
     }
@@ -251,14 +286,49 @@ export default function AuditPage() {
                 >
                   Clear
                 </button>
-                <button
-                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
-                  type="button"
-                  onClick={downloadCsv}
-                  disabled={exporting}
-                >
-                  {exporting ? "Exporting..." : "Download CSV"}
-                </button>
+                <details className="relative">
+                  <summary className="cursor-pointer rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">
+                    {exporting ? "Exporting..." : "Export"}
+                  </summary>
+                  <div className="absolute right-0 z-10 mt-2 w-36 rounded-lg border border-slate-200 bg-white p-2 shadow-md">
+                    <button
+                      className="w-full rounded-md px-2 py-1 text-left text-sm hover:bg-slate-50"
+                      type="button"
+                      onClick={downloadCsv}
+                      disabled={exporting}
+                    >
+                      CSV
+                    </button>
+                    <button
+                      className="w-full rounded-md px-2 py-1 text-left text-sm hover:bg-slate-50"
+                      type="button"
+                      onClick={downloadJson}
+                      disabled={exporting}
+                    >
+                      JSON
+                    </button>
+                  </div>
+                </details>
+                <div className="ml-auto flex items-center gap-2 text-xs text-slate-500">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={refreshEnabled}
+                      onChange={(event) => setRefreshEnabled(event.target.checked)}
+                    />
+                    Auto-refresh
+                  </label>
+                  <select
+                    className="rounded-md border border-slate-200 px-2 py-1 text-xs"
+                    value={refreshInterval}
+                    onChange={(event) => setRefreshInterval(Number(event.target.value))}
+                    disabled={!refreshEnabled}
+                  >
+                    <option value={5000}>5s</option>
+                    <option value={15000}>15s</option>
+                    <option value={30000}>30s</option>
+                  </select>
+                </div>
               </div>
             </form>
 
