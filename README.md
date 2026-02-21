@@ -1,20 +1,31 @@
 # Digital QR Prescription System
 
-Production-ready scaffold for a QR-based prescription platform with a Next.js + TypeScript frontend and a Node.js + Express + TypeScript backend.
+Web app for QR-based prescription creation, verification, and audit tracking.
 
 ## Workspace Layout
 
-- backend: API server, Prisma schema, and security utilities
+- backend: Node.js + Express API, Prisma schema, PostgreSQL
 - frontend: Next.js App Router UI with Tailwind CSS
 - docker: Container templates
-- docs: Architecture notes and diagrams
+- docs: Architecture diagram
 - tests: System-level tests
+
+## Features
+
+- Role-based access: DOCTOR, PATIENT, PHARMACIST, ADMIN
+- QR signing and verification with expiration checks
+- Audit logs and scan history with export support
+- Patient prescription list with QR codes
+
+## Architecture Diagram
+
+See [docs/architecture.mmd](docs/architecture.mmd).
 
 ## Quick Start
 
-1) Install dependencies in both apps:
+1) Install dependencies:
 
-```
+```bash
 cd backend
 npm install
 
@@ -29,7 +40,7 @@ npm install
 
 3) Run the apps:
 
-```
+```bash
 cd backend
 npm run dev
 
@@ -37,8 +48,7 @@ cd ../frontend
 npm run dev
 ```
 
-## Next Steps
+## Scripts
 
-- Add authentication, role-based access, and audit logging
-- Implement prescription flows and QR signing utilities
-- Wire up database migrations and seed data
+- Backend: `npm run dev`, `npm run prisma:migrate`
+- Frontend: `npm run dev`, `npm run build`

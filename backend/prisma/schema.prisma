@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -16,8 +16,10 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   prescriptions Prescription[] @relation("DoctorPrescriptions")
+  redeemedPrescriptions Prescription[] @relation("PrescriptionRedeemer")
   refreshTokens RefreshToken[]
   preference   UserPreference?
+  preferenceDefaultsUpdated PreferenceDefault[] @relation("PreferenceDefaultUpdatedBy")
 }
 
 model Prescription {
@@ -29,12 +31,21 @@ model Prescription {
   notes        String?
   qrPayload    String
   status       String   @default("ACTIVE")
+  redeemedAt   DateTime?
+  redeemedById String?
   expiresAt    DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   doctor       User     @relation("DoctorPrescriptions", fields: [doctorId], references: [id])
+  redeemedBy   User?    @relation("PrescriptionRedeemer", fields: [redeemedById], references: [id])
   auditLogs    AuditLog[]
   scanLogs     ScanLog[]
+  
+  @@index([doctorId])
+  @@index([patientEmail])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([createdAt])
 }
 
 model AuditLog {
@@ -43,9 +54,15 @@ model AuditLog {
   actorRole      String
   actorId        String?
   action         String
+  result         String?
   details        String?
   createdAt      DateTime @default(now())
   prescription   Prescription @relation(fields: [prescriptionId], references: [id])
+  
+  @@index([prescriptionId])
+  @@index([actorId])
+  @@index([createdAt])
+  @@index([action])
 }
 
 model RefreshToken {
@@ -68,6 +85,11 @@ model ScanLog {
   reason         String?
   createdAt      DateTime @default(now())
   prescription   Prescription? @relation(fields: [prescriptionId], references: [id])
+  
+  @@index([prescriptionId])
+  @@index([actorId])
+  @@index([createdAt])
+  @@index([result])
 }
 
 model UserPreference {
@@ -81,4 +103,17 @@ model UserPreference {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
   user                 User     @relation(fields: [userId], references: [id])
+}
+
+model PreferenceDefault {
+  id                   String   @id
+  auditRefreshEnabled  Boolean  @default(true)
+  auditRefreshInterval Int      @default(15000)
+  scanRefreshEnabled   Boolean  @default(true)
+  scanRefreshInterval  Int      @default(15000)
+  scanPinnedVisible    Boolean  @default(true)
+  updatedById           String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  updatedBy            User?    @relation("PreferenceDefaultUpdatedBy", fields: [updatedById], references: [id])
 }

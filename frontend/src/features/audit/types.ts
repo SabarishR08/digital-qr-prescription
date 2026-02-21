@@ -6,6 +6,7 @@ export type AuditLog = {
   actorRole: string;
   actorId?: string | null;
   action: string;
+  result?: string | null;
   details?: string | null;
   createdAt: string;
   prescription: Prescription;

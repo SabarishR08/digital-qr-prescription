@@ -1,0 +1,21 @@
+flowchart LR
+  subgraph Client
+    U[User]
+    FE[Next.js Frontend]
+  end
+
+  subgraph API
+    BE[Express API]
+    AUTH[Auth Middleware]
+    QR[QR Verify + Signing]
+  end
+
+  subgraph Data
+    DB[(PostgreSQL)]
+  end
+
+  U --> FE
+  FE --> BE
+  BE --> AUTH
+  BE --> QR
+  BE --> DB

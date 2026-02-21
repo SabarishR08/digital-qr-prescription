@@ -15,6 +15,7 @@ import {
   getDefaultPreferences,
   loadLocalPreferences,
   mergePreferences,
+  resetPreferences,
   saveLocalPreferences,
   updatePreferences
 } from "../../features/preferences/preferencesService";
@@ -42,6 +43,7 @@ export default function ScansPage() {
   const toastTimerRef = useRef<number | null>(null);
   const [liveToast, setLiveToast] = useState<string | null>(null);
   const [prefsLoaded, setPrefsLoaded] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   const refreshScans = async () => {
     if (!token) {
@@ -448,6 +450,30 @@ export default function ScansPage() {
                     <option value={15000}>15s</option>
                     <option value={30000}>30s</option>
                   </select>
+                  <button
+                    className="rounded-md border border-slate-200 px-2 py-1 text-[11px]"
+                    type="button"
+                    disabled={resetting}
+                    onClick={async () => {
+                      if (!token) {
+                        return;
+                      }
+                      setResetting(true);
+                      try {
+                        const preference = await resetPreferences(token);
+                        setRefreshEnabled(preference.scanRefreshEnabled);
+                        setRefreshInterval(preference.scanRefreshInterval);
+                        setPinnedVisible(preference.scanPinnedVisible);
+                        setLiveToast("Preferences reset to default");
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : "Unable to reset preferences");
+                      } finally {
+                        setResetting(false);
+                      }
+                    }}
+                  >
+                    {resetting ? "Resetting..." : "Reset defaults"}
+                  </button>
                 </div>
               </div>
             </form>

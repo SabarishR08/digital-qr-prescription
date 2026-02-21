@@ -46,6 +46,11 @@ export default function DashboardHeader({ liveModeActive }: DashboardHeaderProps
               Pharmacy
             </Link>
           ) : null}
+          {user?.role === "ADMIN" ? (
+            <Link className="rounded-lg border border-slate-200 px-3 py-1" href="/admin/preferences">
+              Admin defaults
+            </Link>
+          ) : null}
           {user ? (
             <Link className="rounded-lg border border-slate-200 px-3 py-1" href="/audit">
               Audit log

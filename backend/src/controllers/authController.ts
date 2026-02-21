@@ -5,6 +5,7 @@ import { hashPassword, verifyPassword } from "../utils/password";
 import { signToken } from "../utils/jwt";
 import type { Role } from "../types/roles";
 import { generateRefreshToken, hashRefreshToken } from "../utils/refreshToken";
+import { getDefaultPreferences } from "../utils/preferences";
 
 const registerSchema = z.object({
   fullName: z.string().min(2),
@@ -81,6 +82,11 @@ export async function register(req: Request, res: Response) {
     data: {
       userId: user.id
     }
+  });
+  const defaults = await getDefaultPreferences(prisma);
+  await prisma.userPreference.update({
+    where: { userId: user.id },
+    data: defaults
   });
 
   const token = signToken({

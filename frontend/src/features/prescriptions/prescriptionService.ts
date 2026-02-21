@@ -20,6 +20,10 @@ type VerifyResponse = {
   prescription: Prescription;
 };
 
+type ListResponse = {
+  prescriptions: Prescription[];
+};
+
 async function request<T>(path: string, options: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     headers: {
@@ -57,4 +61,21 @@ export async function verifyPrescription(token: string, qrPayload: string) {
     },
     body: JSON.stringify({ qrPayload })
   });
+}
+
+export async function fetchMyPrescriptions(token: string, includeQr = true) {
+  const params = new URLSearchParams();
+  if (includeQr) {
+    params.set("includeQr", "true");
+  }
+
+  const suffix = params.toString();
+  return request<ListResponse>(`/prescriptions${suffix ? `?${suffix}` : ""}`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    }
+  );
 }

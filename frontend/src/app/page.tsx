@@ -13,8 +13,7 @@ export default function HomePage() {
           Digital QR Prescription System
         </h1>
         <p className="text-slate-700">
-          Production-ready foundation for secure prescriptions, QR verification,
-          and role-based workflows.
+          Create prescriptions, verify QR codes, and manage role-based workflows.
         </p>
         <div className="flex flex-wrap gap-3">
           {!user ? (
@@ -56,6 +55,14 @@ export default function HomePage() {
                   href="/pharmacy"
                 >
                   Pharmacy verification
+                </Link>
+              ) : null}
+              {user.role === "ADMIN" ? (
+                <Link
+                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+                  href="/admin/preferences"
+                >
+                  Admin defaults
                 </Link>
               ) : null}
               <button

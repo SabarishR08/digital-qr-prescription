@@ -1,4 +1,4 @@
-import type { UserPreferences } from "./types";
+import type { PreferenceDefaultsResponse, UserPreferences } from "./types";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
@@ -70,6 +70,39 @@ export async function updatePreferences(token: string, updates: Partial<UserPref
   });
 
   return response.preference;
+}
+
+export async function resetPreferences(token: string) {
+  const response = await request<{ preference: UserPreferences }>("/user/preferences/reset", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  return response.preference;
+}
+
+export async function fetchAdminDefaults(token: string) {
+  return request<PreferenceDefaultsResponse>("/user/preferences/defaults", {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+}
+
+export async function updateAdminDefaults(
+  token: string,
+  updates: Partial<UserPreferences>
+) {
+  return request<PreferenceDefaultsResponse>("/user/preferences/defaults", {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(updates)
+  });
 }
 
 export function mergePreferences(

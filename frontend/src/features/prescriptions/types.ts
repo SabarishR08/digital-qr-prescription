@@ -13,7 +13,10 @@ export type Prescription = {
   medications: Medication[];
   notes?: string | null;
   qrPayload: string;
+  qrCode?: string | null;
   status: string;
+  redeemedAt?: string | null;
+  redeemedById?: string | null;
   expiresAt?: string | null;
   createdAt: string;
   updatedAt: string;

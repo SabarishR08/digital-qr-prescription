@@ -7,3 +7,11 @@ export const authRateLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: "Too many attempts. Try again later." }
 });
+
+export const verifyRateLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // 10 attempts per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many verification attempts. Try again later." }
+});

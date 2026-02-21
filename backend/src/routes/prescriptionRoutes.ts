@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { authMiddleware } from "../middleware/authMiddleware";
 import { roleMiddleware } from "../middleware/roleMiddleware";
-import { createPrescription, verifyPrescription } from "../controllers/prescriptionController";
+import { verifyRateLimiter } from "../middleware/rateLimit";
+import { createPrescription, listPrescriptions, verifyPrescription } from "../controllers/prescriptionController";
 
 const router = Router();
 
@@ -12,8 +13,16 @@ router.post(
   createPrescription
 );
 
+router.get(
+  "/",
+  authMiddleware,
+  roleMiddleware(["DOCTOR", "PATIENT", "ADMIN"]),
+  listPrescriptions
+);
+
 router.post(
   "/verify",
+  verifyRateLimiter,
   authMiddleware,
   roleMiddleware(["DOCTOR", "PHARMACIST", "PATIENT"]),
   verifyPrescription

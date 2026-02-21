@@ -70,6 +70,7 @@ function logsToCsv(logs: Array<{ [key: string]: unknown }>) {
   const headers = [
     "createdAt",
     "action",
+    "result",
     "actorRole",
     "actorId",
     "prescriptionId",
@@ -86,6 +87,7 @@ function logsToCsv(logs: Array<{ [key: string]: unknown }>) {
     const values = [
       createdAt,
       typeof log.action === "string" ? log.action : "",
+      typeof log.result === "string" ? log.result : "",
       typeof log.actorRole === "string" ? log.actorRole : "",
       typeof log.actorId === "string" ? log.actorId : "",
       typeof log.prescriptionId === "string" ? log.prescriptionId : "",
@@ -146,7 +148,7 @@ export async function getRecentAuditLogs(req: Request, res: Response) {
   }
 
   if (req.user.role === "DOCTOR") {
-    const where = {
+    const doctorWhere = {
       ...where,
       prescription: { doctorId: req.user.sub }
     };
@@ -155,17 +157,17 @@ export async function getRecentAuditLogs(req: Request, res: Response) {
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         take,
         ...pagination,
-        where,
+        where: doctorWhere,
         include: { prescription: true }
       }),
-      prisma.auditLog.count({ where })
+      prisma.auditLog.count({ where: doctorWhere })
     ]);
 
     const nextCursor = logs.length === take ? logs[logs.length - 1]?.id : null;
     return res.json({ logs, total, limit: take, offset: skip, nextCursor });
   }
 
-  const where = {
+  const patientWhere = {
     ...where,
     actorId: req.user.sub
   };
@@ -174,10 +176,10 @@ export async function getRecentAuditLogs(req: Request, res: Response) {
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take,
       ...pagination,
-      where,
+      where: patientWhere,
       include: { prescription: true }
     }),
-    prisma.auditLog.count({ where })
+    prisma.auditLog.count({ where: patientWhere })
   ]);
 
   const nextCursor = logs.length === take ? logs[logs.length - 1]?.id : null;

@@ -138,7 +138,27 @@ export async function getRecentScans(req: Request, res: Response) {
     return res.json({ scans, total, limit: take, offset: skip, nextCursor });
   }
 
-  const where = {
+  if (req.user.role === "DOCTOR") {
+    const doctorWhere = {
+      ...where,
+      prescription: { doctorId: req.user.sub }
+    };
+    const [scans, total] = await Promise.all([
+      prisma.scanLog.findMany({
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take,
+        ...pagination,
+        where: doctorWhere,
+        include: { prescription: true }
+      }),
+      prisma.scanLog.count({ where: doctorWhere })
+    ]);
+
+    const nextCursor = scans.length === take ? scans[scans.length - 1]?.id : null;
+    return res.json({ scans, total, limit: take, offset: skip, nextCursor });
+  }
+
+  const userWhere = {
     ...where,
     actorId: req.user.sub
   };
@@ -147,10 +167,10 @@ export async function getRecentScans(req: Request, res: Response) {
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take,
       ...pagination,
-      where,
+      where: userWhere,
       include: { prescription: true }
     }),
-    prisma.scanLog.count({ where })
+    prisma.scanLog.count({ where: userWhere })
   ]);
 
   const nextCursor = scans.length === take ? scans[scans.length - 1]?.id : null;
@@ -194,6 +214,14 @@ export async function exportScanCsv(req: Request, res: Response) {
     scans = await prisma.scanLog.findMany({
       ...shared,
       where
+    });
+  } else if (req.user.role === "DOCTOR") {
+    scans = await prisma.scanLog.findMany({
+      ...shared,
+      where: {
+        ...where,
+        prescription: { doctorId: req.user.sub }
+      }
     });
   } else {
     scans = await prisma.scanLog.findMany({

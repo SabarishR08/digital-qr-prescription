@@ -70,6 +70,7 @@ export async function createPrescription(req: Request, res: Response) {
       actorRole: req.user.role,
       actorId: req.user.sub,
       action: "PRESCRIPTION_CREATED",
+      result: "SUCCESS",
       details: `QR issued; expires ${expiresAt.toISOString()}`
     }
   });
@@ -87,6 +88,49 @@ const verifySchema = z.object({
   qrPayload: z.string().min(10)
 });
 
+export async function listPrescriptions(req: Request, res: Response) {
+  if (!req.user) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  let where: Record<string, unknown> = {};
+  if (req.user.role === "DOCTOR") {
+    where = { doctorId: req.user.sub };
+  } else if (req.user.role === "PATIENT") {
+    where = { patientEmail: req.user.email };
+  } else if (req.user.role !== "ADMIN") {
+    return res.status(403).json({ error: "Insufficient permissions" });
+  }
+
+  const prescriptions = await prisma.prescription.findMany({
+    where,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }]
+  });
+
+  const includeQr = String(req.query.includeQr ?? "").toLowerCase() === "true";
+  const allowQr = includeQr || req.user.role === "PATIENT";
+
+  const payload = await Promise.all(
+    prescriptions.map(async (prescription) => {
+      const base = {
+        ...prescription,
+        medications: parseMedications(prescription.medications)
+      };
+      if (!allowQr) {
+        return base;
+      }
+
+      const qrCode = await generateQrCodeDataUrl(prescription.qrPayload);
+      return {
+        ...base,
+        qrCode
+      };
+    })
+  );
+
+  return res.json({ prescriptions: payload });
+}
+
 export async function verifyPrescription(req: Request, res: Response) {
   const parsed = verifySchema.safeParse(req.body);
   if (!parsed.success) {
@@ -100,15 +144,27 @@ export async function verifyPrescription(req: Request, res: Response) {
   const payload = verifyQrPayload(parsed.data.qrPayload);
   if (!payload) {
     if (req.user) {
-      await prisma.scanLog.create({
-        data: {
-          actorId: req.user.sub,
-          actorRole: req.user.role,
-          payloadHash: crypto.createHash("sha256").update(parsed.data.qrPayload).digest("hex"),
-          result: "FAIL",
-          reason: "INVALID_OR_EXPIRED"
-        }
-      });
+      const payloadHash = crypto.createHash("sha256").update(parsed.data.qrPayload).digest("hex");
+      await Promise.all([
+        prisma.scanLog.create({
+          data: {
+            actorId: req.user.sub,
+            actorRole: req.user.role,
+            payloadHash,
+            result: "FAIL",
+            reason: "INVALID_OR_EXPIRED"
+          }
+        }),
+        prisma.auditLog.create({
+          data: {
+            actorRole: req.user.role,
+            actorId: req.user.sub,
+            action: "QR_VERIFIED",
+            result: "FAILED",
+            details: "Invalid or expired QR signature"
+          }
+        })
+      ]);
     }
     return res.status(401).json({ error: "Invalid or expired QR" });
   }
@@ -118,17 +174,132 @@ export async function verifyPrescription(req: Request, res: Response) {
   });
 
   if (!prescription) {
-    await prisma.scanLog.create({
+    const payloadHash = crypto.createHash("sha256").update(parsed.data.qrPayload).digest("hex");
+    await Promise.all([
+      prisma.scanLog.create({
+        data: {
+          actorId: req.user.sub,
+          actorRole: req.user.role,
+          prescriptionId: payload.prescriptionId,
+          payloadHash,
+          result: "FAIL",
+          reason: "NOT_FOUND"
+        }
+      }),
+      prisma.auditLog.create({
+        data: {
+          prescriptionId: payload.prescriptionId,
+          actorRole: req.user.role,
+          actorId: req.user.sub,
+          action: "QR_VERIFIED",
+          result: "FAILED",
+          details: "Prescription not found"
+        }
+      })
+    ]);
+    return res.status(404).json({ error: "Prescription not found" });
+  }
+
+  if (prescription.expiresAt && prescription.expiresAt.getTime() < Date.now()) {
+    const payloadHash = crypto.createHash("sha256").update(parsed.data.qrPayload).digest("hex");
+    await Promise.all([
+      prisma.scanLog.create({
+        data: {
+          actorId: req.user.sub,
+          actorRole: req.user.role,
+          prescriptionId: prescription.id,
+          payloadHash,
+          result: "FAIL",
+          reason: "EXPIRED"
+        }
+      }),
+      prisma.auditLog.create({
+        data: {
+          prescriptionId: prescription.id,
+          actorRole: req.user.role,
+          actorId: req.user.sub,
+          action: "QR_VERIFIED",
+          result: "FAILED",
+          details: `Prescription expired at ${prescription.expiresAt.toISOString()}`
+        }
+      })
+    ]);
+    return res.status(410).json({ error: "Prescription expired" });
+  }
+
+  if (req.user.role === "PHARMACIST" && (prescription.status !== "ACTIVE" || prescription.redeemedAt)) {
+    const payloadHash = crypto.createHash("sha256").update(parsed.data.qrPayload).digest("hex");
+    await Promise.all([
+      prisma.scanLog.create({
+        data: {
+          actorId: req.user.sub,
+          actorRole: req.user.role,
+          prescriptionId: prescription.id,
+          payloadHash,
+          result: "FAIL",
+          reason: "ALREADY_REDEEMED"
+        }
+      }),
+      prisma.auditLog.create({
+        data: {
+          prescriptionId: prescription.id,
+          actorRole: req.user.role,
+          actorId: req.user.sub,
+          action: "QR_VERIFIED",
+          result: "FAILED",
+          details: `Already redeemed at ${prescription.redeemedAt?.toISOString() ?? "unknown"}`
+        }
+      })
+    ]);
+    return res.status(409).json({ error: "Prescription already redeemed" });
+  }
+
+  let resolvedPrescription = prescription;
+  if (req.user.role === "PHARMACIST") {
+    const updated = await prisma.prescription.updateMany({
+      where: {
+        id: prescription.id,
+        status: "ACTIVE",
+        redeemedAt: null
+      },
       data: {
-        actorId: req.user.sub,
-        actorRole: req.user.role,
-        prescriptionId: payload.prescriptionId,
-        payloadHash: crypto.createHash("sha256").update(parsed.data.qrPayload).digest("hex"),
-        result: "FAIL",
-        reason: "NOT_FOUND"
+        status: "REDEEMED",
+        redeemedAt: new Date(),
+        redeemedById: req.user.sub
       }
     });
-    return res.status(404).json({ error: "Prescription not found" });
+
+    if (updated.count === 0) {
+      const payloadHash = crypto.createHash("sha256").update(parsed.data.qrPayload).digest("hex");
+      await Promise.all([
+        prisma.scanLog.create({
+          data: {
+            actorId: req.user.sub,
+            actorRole: req.user.role,
+            prescriptionId: prescription.id,
+            payloadHash,
+            result: "FAIL",
+            reason: "ALREADY_REDEEMED"
+          }
+        }),
+        prisma.auditLog.create({
+          data: {
+            prescriptionId: prescription.id,
+            actorRole: req.user.role,
+            actorId: req.user.sub,
+            action: "QR_VERIFIED",
+            result: "FAILED",
+            details: "Race condition: Already redeemed"
+          }
+        })
+      ]);
+      return res.status(409).json({ error: "Prescription already redeemed" });
+    }
+
+    const refreshed = await prisma.prescription.findUnique({ where: { id: prescription.id } });
+    if (refreshed) {
+      resolvedPrescription = refreshed;
+    }
   }
 
   await prisma.auditLog.create({
@@ -137,6 +308,7 @@ export async function verifyPrescription(req: Request, res: Response) {
       actorRole: req.user.role,
       actorId: req.user.sub,
       action: "QR_VERIFIED",
+      result: "SUCCESS",
       details: `Verified by ${req.user.role}`
     }
   });
@@ -154,8 +326,8 @@ export async function verifyPrescription(req: Request, res: Response) {
 
   return res.json({
     prescription: {
-      ...prescription,
-      medications: parseMedications(prescription.medications)
+      ...resolvedPrescription,
+      medications: parseMedications(resolvedPrescription.medications)
     }
   });
 }
