@@ -31,6 +31,9 @@ export default function ScansPage() {
   const [refreshInterval, setRefreshInterval] = useState(15000);
   const [pinnedVisible, setPinnedVisible] = useState(true);
   const interactionTimerRef = useRef<number | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
+  const [liveToast, setLiveToast] = useState<string | null>(null);
+  const storageKey = "qr-prescription:scan-preferences";
 
   const refreshScans = async () => {
     if (!token) {
@@ -60,6 +63,39 @@ export default function ScansPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(storageKey);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored) as {
+          refreshEnabled?: boolean;
+          refreshInterval?: number;
+          pinnedVisible?: boolean;
+        };
+        if (typeof parsed.refreshEnabled === "boolean") {
+          setRefreshEnabled(parsed.refreshEnabled);
+        }
+        if (typeof parsed.refreshInterval === "number") {
+          setRefreshInterval(parsed.refreshInterval);
+        }
+        if (typeof parsed.pinnedVisible === "boolean") {
+          setPinnedVisible(parsed.pinnedVisible);
+        }
+      } catch {
+        window.localStorage.removeItem(storageKey);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const payload = JSON.stringify({
+      refreshEnabled,
+      refreshInterval,
+      pinnedVisible
+    });
+    window.localStorage.setItem(storageKey, payload);
+  }, [refreshEnabled, refreshInterval, pinnedVisible]);
 
   useEffect(() => {
     if (!token) {
@@ -108,6 +144,21 @@ export default function ScansPage() {
 
     return () => window.clearInterval(interval);
   }, [token, isInteracting, loading, exporting, refreshEnabled, refreshInterval, limit, result, actorRole, prescriptionId, from, to, query]);
+
+  useEffect(() => {
+    if (!liveToast) {
+      return;
+    }
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = window.setTimeout(() => setLiveToast(null), 2200);
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, [liveToast]);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -319,6 +370,9 @@ export default function ScansPage() {
                   <summary className="cursor-pointer rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">
                     {exporting ? "Exporting..." : "Export"}
                   </summary>
+                  <span className="absolute -right-2 -top-2 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">
+                    Ctrl+E
+                  </span>
                   <div className="absolute right-0 z-10 mt-2 w-36 rounded-lg border border-slate-200 bg-white p-2 shadow-md">
                     <button
                       className="w-full rounded-md px-2 py-1 text-left text-sm hover:bg-slate-50"
@@ -343,10 +397,17 @@ export default function ScansPage() {
                     <input
                       type="checkbox"
                       checked={refreshEnabled}
-                      onChange={(event) => setRefreshEnabled(event.target.checked)}
+                      onChange={(event) => {
+                        const next = event.target.checked;
+                        setRefreshEnabled(next);
+                        setLiveToast(next ? "Live mode enabled" : "Live mode paused");
+                      }}
                     />
                     Auto-refresh
                   </label>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">
+                    Ctrl+R
+                  </span>
                   <label className="flex items-center gap-2">
                     <input
                       type="checkbox"
@@ -504,6 +565,11 @@ export default function ScansPage() {
               <p className="mt-1 truncate text-[11px] text-slate-500">
                 {scans[0].prescriptionId ?? "Unknown prescription"}
               </p>
+            </div>
+          ) : null}
+          {liveToast ? (
+            <div className="fixed bottom-6 left-6 z-20 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 shadow-lg">
+              {liveToast}
             </div>
           ) : null}
         </section>

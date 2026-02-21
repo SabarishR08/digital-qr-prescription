@@ -210,6 +210,9 @@ export default function PatientPage() {
                     <summary className="cursor-pointer rounded-md border border-slate-200 px-2 py-1 text-[10px]">
                       {scanExporting ? "Exporting..." : "Export"}
                     </summary>
+                    <span className="absolute -right-2 -top-2 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">
+                      Ctrl+E
+                    </span>
                     <div className="absolute right-0 z-10 mt-2 w-28 rounded-md border border-slate-200 bg-white p-1 shadow-md">
                       <button
                         className="w-full rounded-md px-2 py-1 text-left text-[11px] hover:bg-slate-50"
