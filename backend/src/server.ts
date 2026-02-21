@@ -4,6 +4,7 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import authRoutes from "./routes/authRoutes";
 import prescriptionRoutes from "./routes/prescriptionRoutes";
+import auditRoutes from "./routes/auditRoutes";
 
 dotenv.config();
 
@@ -24,6 +25,7 @@ app.get("/health", (_req, res) => {
 
 app.use("/auth", authRoutes);
 app.use("/prescriptions", prescriptionRoutes);
+app.use("/audit", auditRoutes);
 
 app.listen(port, () => {
   console.log(`API listening on ${port}`);

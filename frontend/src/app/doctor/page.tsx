@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import RoleGuard from "../../components/RoleGuard";
+import DashboardHeader from "../../components/DashboardHeader";
+import QrScanner from "../../components/QrScanner";
 import { useAuth } from "../../features/auth/AuthContext";
-import { createPrescription } from "../../features/prescriptions/prescriptionService";
+import { createPrescription, verifyPrescription } from "../../features/prescriptions/prescriptionService";
 import type { Medication, Prescription } from "../../features/prescriptions/types";
 
 const emptyMedication = (): Medication => ({
@@ -21,6 +23,9 @@ export default function DoctorPage() {
   const [medications, setMedications] = useState<Medication[]>([emptyMedication()]);
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [created, setCreated] = useState<Prescription | null>(null);
+  const [verifyPayload, setVerifyPayload] = useState("");
+  const [verifyResult, setVerifyResult] = useState<Prescription | null>(null);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,13 +72,8 @@ export default function DoctorPage() {
   return (
     <RoleGuard roles={["DOCTOR"]}>
       <main className="min-h-screen bg-slate-50 p-8">
-        <section className="mx-auto max-w-4xl space-y-6">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h1 className="text-2xl font-semibold text-slate-900">Doctor workspace</h1>
-            <p className="text-sm text-slate-600">
-              Signed in as {user?.fullName}. Create a new prescription below.
-            </p>
-          </div>
+        <section className="mx-auto max-w-5xl space-y-6">
+          <DashboardHeader />
 
           <form
             className="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
@@ -211,6 +211,62 @@ export default function DoctorPage() {
               </div>
             </section>
           ) : null}
+
+          <section className="grid gap-6 md:grid-cols-[1.1fr_0.9fr]">
+            <form
+              className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+              onSubmit={async (event) => {
+                event.preventDefault();
+                if (!token) {
+                  setVerifyError("Missing auth token. Please sign in again.");
+                  return;
+                }
+                setVerifyError(null);
+                try {
+                  const response = await verifyPrescription(token, verifyPayload);
+                  setVerifyResult(response.prescription);
+                } catch (err) {
+                  setVerifyError(err instanceof Error ? err.message : "Verification failed");
+                }
+              }}
+            >
+              <h2 className="text-lg font-semibold text-slate-900">Verify a QR payload</h2>
+              <label className="text-sm font-medium text-slate-700">
+                QR payload
+                <textarea
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                  rows={3}
+                  value={verifyPayload}
+                  onChange={(event) => setVerifyPayload(event.target.value)}
+                  required
+                />
+              </label>
+              {verifyError ? (
+                <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                  {verifyError}
+                </p>
+              ) : null}
+              <button
+                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                type="submit"
+              >
+                Verify
+              </button>
+              {verifyResult ? (
+                <div className="rounded-xl border border-slate-200 p-4 text-sm text-slate-700">
+                  Verified {verifyResult.patientName} · {verifyResult.medications.length} meds
+                </div>
+              ) : null}
+            </form>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-slate-900">Scan with camera</h2>
+              <p className="text-xs text-slate-500">Scans fill the QR payload input.</p>
+              <div className="mt-4">
+                <QrScanner onResult={setVerifyPayload} />
+              </div>
+            </div>
+          </section>
         </section>
       </main>
     </RoleGuard>

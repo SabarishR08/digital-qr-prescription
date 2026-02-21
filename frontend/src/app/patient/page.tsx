@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import RoleGuard from "../../components/RoleGuard";
+import DashboardHeader from "../../components/DashboardHeader";
+import QrScanner from "../../components/QrScanner";
 import { useAuth } from "../../features/auth/AuthContext";
 import { verifyPrescription } from "../../features/prescriptions/prescriptionService";
 import type { Prescription } from "../../features/prescriptions/types";
@@ -36,13 +38,8 @@ export default function PatientPage() {
   return (
     <RoleGuard roles={["PATIENT"]}>
       <main className="min-h-screen bg-slate-50 p-8">
-        <section className="mx-auto max-w-3xl space-y-6">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h1 className="text-2xl font-semibold text-slate-900">Patient portal</h1>
-            <p className="text-sm text-slate-600">
-              Signed in as {user?.fullName}. Paste a QR payload to view your prescription.
-            </p>
-          </div>
+        <section className="mx-auto max-w-4xl space-y-6">
+          <DashboardHeader />
 
           <form className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" onSubmit={handleVerify}>
             <label className="text-sm font-medium text-slate-700">
@@ -70,6 +67,14 @@ export default function PatientPage() {
               {loading ? "Checking..." : "View prescription"}
             </button>
           </form>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-900">Scan with camera</h2>
+            <p className="text-xs text-slate-500">Scans fill the QR payload field.</p>
+            <div className="mt-4">
+              <QrScanner onResult={setQrPayload} />
+            </div>
+          </div>
 
           {result ? (
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
