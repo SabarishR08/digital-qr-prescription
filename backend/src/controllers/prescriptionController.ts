@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
+import crypto from "crypto";
 import prisma from "../config/prisma";
 import { createQrPayload, verifyQrPayload } from "../utils/qrPayload";
 import { generateQrCodeDataUrl } from "../utils/qrCode";
@@ -98,6 +99,17 @@ export async function verifyPrescription(req: Request, res: Response) {
 
   const payload = verifyQrPayload(parsed.data.qrPayload);
   if (!payload) {
+    if (req.user) {
+      await prisma.scanLog.create({
+        data: {
+          actorId: req.user.sub,
+          actorRole: req.user.role,
+          payloadHash: crypto.createHash("sha256").update(parsed.data.qrPayload).digest("hex"),
+          result: "FAIL",
+          reason: "INVALID_OR_EXPIRED"
+        }
+      });
+    }
     return res.status(401).json({ error: "Invalid or expired QR" });
   }
 
@@ -106,6 +118,16 @@ export async function verifyPrescription(req: Request, res: Response) {
   });
 
   if (!prescription) {
+    await prisma.scanLog.create({
+      data: {
+        actorId: req.user.sub,
+        actorRole: req.user.role,
+        prescriptionId: payload.prescriptionId,
+        payloadHash: crypto.createHash("sha256").update(parsed.data.qrPayload).digest("hex"),
+        result: "FAIL",
+        reason: "NOT_FOUND"
+      }
+    });
     return res.status(404).json({ error: "Prescription not found" });
   }
 
@@ -116,6 +138,17 @@ export async function verifyPrescription(req: Request, res: Response) {
       actorId: req.user.sub,
       action: "QR_VERIFIED",
       details: `Verified by ${req.user.role}`
+    }
+  });
+
+  await prisma.scanLog.create({
+    data: {
+      actorId: req.user.sub,
+      actorRole: req.user.role,
+      prescriptionId: prescription.id,
+      payloadHash: crypto.createHash("sha256").update(parsed.data.qrPayload).digest("hex"),
+      result: "SUCCESS",
+      reason: "VERIFIED"
     }
   });
 

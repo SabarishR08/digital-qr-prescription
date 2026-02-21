@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import RoleGuard from "../../components/RoleGuard";
 import DashboardHeader from "../../components/DashboardHeader";
 import { useAuth } from "../../features/auth/AuthContext";
-import { fetchAuditLogs, fetchAuditLogsFiltered } from "../../features/audit/auditService";
+import { exportAuditCsv, fetchAuditLogs, fetchAuditLogsFiltered } from "../../features/audit/auditService";
 import type { AuditLog } from "../../features/audit/types";
 
 export default function AuditPage() {
@@ -18,6 +18,7 @@ export default function AuditPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [limit, setLimit] = useState(50);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -70,6 +71,35 @@ export default function AuditPage() {
     setFrom("");
     setTo("");
     setLimit(50);
+  };
+
+  const downloadCsv = async () => {
+    if (!token) {
+      return;
+    }
+
+    setExporting(true);
+    try {
+      const blob = await exportAuditCsv(token, {
+        limit,
+        action: action.trim() || undefined,
+        actorRole: actorRole || undefined,
+        prescriptionId: prescriptionId.trim() || undefined,
+        from: from || undefined,
+        to: to || undefined
+      });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      const stamp = new Date().toISOString().slice(0, 10);
+      anchor.href = url;
+      anchor.download = `audit-logs-${stamp}.csv`;
+      anchor.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to export CSV");
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -146,7 +176,7 @@ export default function AuditPage() {
                   onChange={(event) => setLimit(Number(event.target.value))}
                 />
               </label>
-              <div className="flex items-end gap-2">
+              <div className="flex flex-wrap items-end gap-2">
                 <button
                   className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
                   type="submit"
@@ -159,6 +189,14 @@ export default function AuditPage() {
                   onClick={clearFilters}
                 >
                   Clear
+                </button>
+                <button
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+                  type="button"
+                  onClick={downloadCsv}
+                  disabled={exporting}
+                >
+                  {exporting ? "Exporting..." : "Download CSV"}
                 </button>
               </div>
             </form>

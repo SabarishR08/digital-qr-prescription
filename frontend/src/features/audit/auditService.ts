@@ -72,3 +72,41 @@ export async function fetchAuditLogsFiltered(token: string, filters: AuditFilter
     }
   });
 }
+
+export async function exportAuditCsv(token: string, filters: AuditFilters) {
+  const params = new URLSearchParams();
+  if (filters.limit) {
+    params.set("limit", String(filters.limit));
+  }
+  if (filters.action) {
+    params.set("action", filters.action);
+  }
+  if (filters.actorRole) {
+    params.set("actorRole", filters.actorRole);
+  }
+  if (filters.prescriptionId) {
+    params.set("prescriptionId", filters.prescriptionId);
+  }
+  if (filters.from) {
+    params.set("from", filters.from);
+  }
+  if (filters.to) {
+    params.set("to", filters.to);
+  }
+
+  const response = await fetch(`${API_BASE}/audit/export?${params.toString()}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`
+    },
+    credentials: "include"
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    const message = body?.error ?? "Request failed";
+    throw new Error(message);
+  }
+
+  return response.blob();
+}

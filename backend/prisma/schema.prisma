@@ -33,6 +33,7 @@ model Prescription {
   updatedAt    DateTime @updatedAt
   doctor       User     @relation("DoctorPrescriptions", fields: [doctorId], references: [id])
   auditLogs    AuditLog[]
+  scanLogs     ScanLog[]
 }
 
 model AuditLog {
@@ -54,4 +55,16 @@ model RefreshToken {
   expiresAt  DateTime
   createdAt  DateTime @default(now())
   user       User     @relation(fields: [userId], references: [id])
+}
+
+model ScanLog {
+  id             String   @id @default(cuid())
+  prescriptionId String?
+  actorId        String
+  actorRole      String
+  payloadHash    String
+  result         String
+  reason         String?
+  createdAt      DateTime @default(now())
+  prescription   Prescription? @relation(fields: [prescriptionId], references: [id])
 }

@@ -7,6 +7,8 @@ import QrScanner from "../../components/QrScanner";
 import { useAuth } from "../../features/auth/AuthContext";
 import { verifyPrescription } from "../../features/prescriptions/prescriptionService";
 import type { Prescription } from "../../features/prescriptions/types";
+import { fetchScanHistory } from "../../features/scans/scanService";
+import type { ScanLog } from "../../features/scans/types";
 
 export default function PharmacyPage() {
   const { token, user } = useAuth();
@@ -14,7 +16,9 @@ export default function PharmacyPage() {
   const [result, setResult] = useState<Prescription | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [scanHistory, setScanHistory] = useState<string[]>([]);
+  const [scanHistory, setScanHistory] = useState<ScanLog[]>([]);
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [lastScan, setLastScan] = useState<string | null>(null);
 
@@ -27,6 +31,27 @@ export default function PharmacyPage() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
+  const loadScanHistory = async () => {
+    if (!token) {
+      return;
+    }
+
+    setScanLoading(true);
+    setScanError(null);
+    try {
+      const response = await fetchScanHistory(token, 10);
+      setScanHistory(response.scans);
+    } catch (err) {
+      setScanError(err instanceof Error ? err.message : "Unable to load scan history");
+    } finally {
+      setScanLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadScanHistory();
+  }, [token]);
+
   const handleScan = (text: string) => {
     if (text === lastScan) {
       return;
@@ -34,7 +59,6 @@ export default function PharmacyPage() {
 
     setLastScan(text);
     setQrPayload(text);
-    setScanHistory((prev) => [text, ...prev].slice(0, 5));
     setToast("QR captured");
   };
 
@@ -51,8 +75,10 @@ export default function PharmacyPage() {
     try {
       const response = await verifyPrescription(token, qrPayload);
       setResult(response.prescription);
+      await loadScanHistory();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Verification failed");
+      await loadScanHistory();
     } finally {
       setLoading(false);
     }
@@ -102,13 +128,31 @@ export default function PharmacyPage() {
                 {toast}
               </div>
             ) : null}
-            {scanHistory.length ? (
+            {scanError ? (
+              <div className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                {scanError}
+              </div>
+            ) : null}
+            {scanLoading ? (
+              <p className="mt-3 text-xs text-slate-500">Loading scan history...</p>
+            ) : null}
+            {!scanLoading && scanHistory.length ? (
               <div className="mt-4 text-xs text-slate-600">
                 Recent scans:
                 <div className="mt-2 space-y-2">
-                  {scanHistory.map((scan, index) => (
-                    <div key={`${scan}-${index}`} className="truncate rounded-md bg-slate-50 px-2 py-1">
-                      {scan}
+                  {scanHistory.map((scan) => (
+                    <div key={scan.id} className="rounded-md bg-slate-50 px-2 py-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold text-slate-700">
+                          {scan.result}
+                        </span>
+                        <span className="text-[10px] text-slate-500">
+                          {new Date(scan.createdAt).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="mt-1 truncate text-[11px] text-slate-500">
+                        {scan.prescriptionId ?? "Unknown prescription"}
+                      </div>
                     </div>
                   ))}
                 </div>
