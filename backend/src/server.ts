@@ -6,6 +6,7 @@ import authRoutes from "./routes/authRoutes";
 import prescriptionRoutes from "./routes/prescriptionRoutes";
 import auditRoutes from "./routes/auditRoutes";
 import scanRoutes from "./routes/scanRoutes";
+import preferenceRoutes from "./routes/preferenceRoutes";
 
 dotenv.config();
 
@@ -28,6 +29,7 @@ app.use("/auth", authRoutes);
 app.use("/prescriptions", prescriptionRoutes);
 app.use("/audit", auditRoutes);
 app.use("/scans", scanRoutes);
+app.use("/user", preferenceRoutes);
 
 app.listen(port, () => {
   console.log(`API listening on ${port}`);

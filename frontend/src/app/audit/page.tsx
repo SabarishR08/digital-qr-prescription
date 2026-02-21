@@ -6,6 +6,14 @@ import DashboardHeader from "../../components/DashboardHeader";
 import { useAuth } from "../../features/auth/AuthContext";
 import { exportAuditCsv, exportAuditJson, fetchAuditLogsFiltered } from "../../features/audit/auditService";
 import type { AuditLog } from "../../features/audit/types";
+import {
+  fetchPreferences,
+  getDefaultPreferences,
+  loadLocalPreferences,
+  mergePreferences,
+  saveLocalPreferences,
+  updatePreferences
+} from "../../features/preferences/preferencesService";
 
 export default function AuditPage() {
   const { token } = useAuth();
@@ -28,7 +36,7 @@ export default function AuditPage() {
   const interactionTimerRef = useRef<number | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const [liveToast, setLiveToast] = useState<string | null>(null);
-  const storageKey = "qr-prescription:audit-preferences";
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
 
   const refreshLogs = async () => {
     if (!token) {
@@ -60,32 +68,47 @@ export default function AuditPage() {
   };
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(storageKey);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored) as {
-          refreshEnabled?: boolean;
-          refreshInterval?: number;
-        };
-        if (typeof parsed.refreshEnabled === "boolean") {
-          setRefreshEnabled(parsed.refreshEnabled);
-        }
-        if (typeof parsed.refreshInterval === "number") {
-          setRefreshInterval(parsed.refreshInterval);
-        }
-      } catch {
-        window.localStorage.removeItem(storageKey);
-      }
+    if (!token) {
+      return;
     }
-  }, []);
+
+    const loadPrefs = async () => {
+      try {
+        const remote = await fetchPreferences(token);
+        const merged = mergePreferences(getDefaultPreferences(), remote);
+        setRefreshEnabled(merged.auditRefreshEnabled);
+        setRefreshInterval(merged.auditRefreshInterval);
+        saveLocalPreferences(merged);
+      } catch {
+        const local = loadLocalPreferences() ?? getDefaultPreferences();
+        setRefreshEnabled(local.auditRefreshEnabled);
+        setRefreshInterval(local.auditRefreshInterval);
+      } finally {
+        setPrefsLoaded(true);
+      }
+    };
+
+    loadPrefs();
+  }, [token]);
 
   useEffect(() => {
-    const payload = JSON.stringify({
-      refreshEnabled,
-      refreshInterval
+    if (!prefsLoaded) {
+      return;
+    }
+
+    const current = mergePreferences(getDefaultPreferences(), {
+      auditRefreshEnabled: refreshEnabled,
+      auditRefreshInterval: refreshInterval
     });
-    window.localStorage.setItem(storageKey, payload);
-  }, [refreshEnabled, refreshInterval]);
+    saveLocalPreferences(current);
+
+    if (token) {
+      updatePreferences(token, {
+        auditRefreshEnabled: refreshEnabled,
+        auditRefreshInterval: refreshInterval
+      }).catch(() => undefined);
+    }
+  }, [prefsLoaded, refreshEnabled, refreshInterval, token]);
 
   useEffect(() => {
     if (!token) {

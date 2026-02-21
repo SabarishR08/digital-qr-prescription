@@ -17,6 +17,7 @@ model User {
   updatedAt    DateTime @updatedAt
   prescriptions Prescription[] @relation("DoctorPrescriptions")
   refreshTokens RefreshToken[]
+  preference   UserPreference?
 }
 
 model Prescription {
@@ -67,4 +68,17 @@ model ScanLog {
   reason         String?
   createdAt      DateTime @default(now())
   prescription   Prescription? @relation(fields: [prescriptionId], references: [id])
+}
+
+model UserPreference {
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  auditRefreshEnabled  Boolean  @default(true)
+  auditRefreshInterval Int      @default(15000)
+  scanRefreshEnabled   Boolean  @default(true)
+  scanRefreshInterval  Int      @default(15000)
+  scanPinnedVisible    Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  user                 User     @relation(fields: [userId], references: [id])
 }

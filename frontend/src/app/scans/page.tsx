@@ -10,6 +10,14 @@ import {
 } from "../../features/scans/scanService";
 import { useAuth } from "../../features/auth/AuthContext";
 import type { ScanLog } from "../../features/scans/types";
+import {
+  fetchPreferences,
+  getDefaultPreferences,
+  loadLocalPreferences,
+  mergePreferences,
+  saveLocalPreferences,
+  updatePreferences
+} from "../../features/preferences/preferencesService";
 
 export default function ScansPage() {
   const { token } = useAuth();
@@ -33,7 +41,7 @@ export default function ScansPage() {
   const interactionTimerRef = useRef<number | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const [liveToast, setLiveToast] = useState<string | null>(null);
-  const storageKey = "qr-prescription:scan-preferences";
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
 
   const refreshScans = async () => {
     if (!token) {
@@ -65,37 +73,51 @@ export default function ScansPage() {
   };
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(storageKey);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored) as {
-          refreshEnabled?: boolean;
-          refreshInterval?: number;
-          pinnedVisible?: boolean;
-        };
-        if (typeof parsed.refreshEnabled === "boolean") {
-          setRefreshEnabled(parsed.refreshEnabled);
-        }
-        if (typeof parsed.refreshInterval === "number") {
-          setRefreshInterval(parsed.refreshInterval);
-        }
-        if (typeof parsed.pinnedVisible === "boolean") {
-          setPinnedVisible(parsed.pinnedVisible);
-        }
-      } catch {
-        window.localStorage.removeItem(storageKey);
-      }
+    if (!token) {
+      return;
     }
-  }, []);
+
+    const loadPrefs = async () => {
+      try {
+        const remote = await fetchPreferences(token);
+        const merged = mergePreferences(getDefaultPreferences(), remote);
+        setRefreshEnabled(merged.scanRefreshEnabled);
+        setRefreshInterval(merged.scanRefreshInterval);
+        setPinnedVisible(merged.scanPinnedVisible);
+        saveLocalPreferences(merged);
+      } catch {
+        const local = loadLocalPreferences() ?? getDefaultPreferences();
+        setRefreshEnabled(local.scanRefreshEnabled);
+        setRefreshInterval(local.scanRefreshInterval);
+        setPinnedVisible(local.scanPinnedVisible);
+      } finally {
+        setPrefsLoaded(true);
+      }
+    };
+
+    loadPrefs();
+  }, [token]);
 
   useEffect(() => {
-    const payload = JSON.stringify({
-      refreshEnabled,
-      refreshInterval,
-      pinnedVisible
+    if (!prefsLoaded) {
+      return;
+    }
+
+    const current = mergePreferences(getDefaultPreferences(), {
+      scanRefreshEnabled: refreshEnabled,
+      scanRefreshInterval: refreshInterval,
+      scanPinnedVisible: pinnedVisible
     });
-    window.localStorage.setItem(storageKey, payload);
-  }, [refreshEnabled, refreshInterval, pinnedVisible]);
+    saveLocalPreferences(current);
+
+    if (token) {
+      updatePreferences(token, {
+        scanRefreshEnabled: refreshEnabled,
+        scanRefreshInterval: refreshInterval,
+        scanPinnedVisible: pinnedVisible
+      }).catch(() => undefined);
+    }
+  }, [prefsLoaded, refreshEnabled, refreshInterval, pinnedVisible, token]);
 
   useEffect(() => {
     if (!token) {

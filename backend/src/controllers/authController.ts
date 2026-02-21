@@ -77,6 +77,12 @@ export async function register(req: Request, res: Response) {
     }
   });
 
+  await prisma.userPreference.create({
+    data: {
+      userId: user.id
+    }
+  });
+
   const token = signToken({
     sub: user.id,
     role: user.role as Role,
