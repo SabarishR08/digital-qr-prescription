@@ -6,11 +6,14 @@ const DEFAULT_LIMIT = 50;
 type AuditFilters = {
   where: Record<string, unknown>;
   take: number;
+  skip: number;
 };
 
 function buildAuditFilters(req: Request): AuditFilters {
   const limit = Number(req.query.limit ?? DEFAULT_LIMIT);
   const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.min(limit, 200) : DEFAULT_LIMIT;
+  const offset = Number(req.query.offset ?? 0);
+  const safeOffset = Number.isFinite(offset) && offset >= 0 ? Math.min(offset, 10000) : 0;
   const action = req.query.action ? String(req.query.action) : undefined;
   const actorRole = req.query.actorRole ? String(req.query.actorRole) : undefined;
   const prescriptionId = req.query.prescriptionId ? String(req.query.prescriptionId) : undefined;
@@ -43,7 +46,7 @@ function buildAuditFilters(req: Request): AuditFilters {
     };
   }
 
-  return { where: baseWhere, take: safeLimit };
+  return { where: baseWhere, take: safeLimit, skip: safeOffset };
 }
 
 function escapeCsv(value: string) {
@@ -92,44 +95,58 @@ export async function getRecentAuditLogs(req: Request, res: Response) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const { where: baseWhere, take } = buildAuditFilters(req);
+  const { where: baseWhere, take, skip } = buildAuditFilters(req);
 
   if (req.user.role === "ADMIN") {
-    const logs = await prisma.auditLog.findMany({
-      orderBy: { createdAt: "desc" },
-      take,
-      where: baseWhere,
-      include: { prescription: true }
-    });
+    const [logs, total] = await Promise.all([
+      prisma.auditLog.findMany({
+        orderBy: { createdAt: "desc" },
+        take,
+        skip,
+        where: baseWhere,
+        include: { prescription: true }
+      }),
+      prisma.auditLog.count({ where: baseWhere })
+    ]);
 
-    return res.json({ logs });
+    return res.json({ logs, total, limit: take, offset: skip });
   }
 
   if (req.user.role === "DOCTOR") {
-    const logs = await prisma.auditLog.findMany({
-      orderBy: { createdAt: "desc" },
-      take,
-      where: {
-        ...baseWhere,
-        prescription: { doctorId: req.user.sub }
-      },
-      include: { prescription: true }
-    });
+    const where = {
+      ...baseWhere,
+      prescription: { doctorId: req.user.sub }
+    };
+    const [logs, total] = await Promise.all([
+      prisma.auditLog.findMany({
+        orderBy: { createdAt: "desc" },
+        take,
+        skip,
+        where,
+        include: { prescription: true }
+      }),
+      prisma.auditLog.count({ where })
+    ]);
 
-    return res.json({ logs });
+    return res.json({ logs, total, limit: take, offset: skip });
   }
 
-  const logs = await prisma.auditLog.findMany({
-    orderBy: { createdAt: "desc" },
-    take,
-    where: {
-      ...baseWhere,
-      actorId: req.user.sub
-    },
-    include: { prescription: true }
-  });
+  const where = {
+    ...baseWhere,
+    actorId: req.user.sub
+  };
+  const [logs, total] = await Promise.all([
+    prisma.auditLog.findMany({
+      orderBy: { createdAt: "desc" },
+      take,
+      skip,
+      where,
+      include: { prescription: true }
+    }),
+    prisma.auditLog.count({ where })
+  ]);
 
-  return res.json({ logs });
+  return res.json({ logs, total, limit: take, offset: skip });
 }
 
 export async function exportAuditCsv(req: Request, res: Response) {
@@ -137,10 +154,11 @@ export async function exportAuditCsv(req: Request, res: Response) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const { where: baseWhere, take } = buildAuditFilters(req);
+  const { where: baseWhere, take, skip } = buildAuditFilters(req);
   const shared = {
     orderBy: { createdAt: "desc" },
     take,
+    skip,
     include: { prescription: true }
   } as const;
 

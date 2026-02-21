@@ -3,21 +3,25 @@
 import { useEffect, useState } from "react";
 import RoleGuard from "../../components/RoleGuard";
 import DashboardHeader from "../../components/DashboardHeader";
+import {
+  exportScanCsv,
+  fetchScanHistory,
+  fetchScanHistoryFiltered
+} from "../../features/scans/scanService";
 import { useAuth } from "../../features/auth/AuthContext";
-import { exportAuditCsv, fetchAuditLogs, fetchAuditLogsFiltered } from "../../features/audit/auditService";
-import type { AuditLog } from "../../features/audit/types";
+import type { ScanLog } from "../../features/scans/types";
 
-export default function AuditPage() {
+export default function ScansPage() {
   const { token } = useAuth();
-  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [scans, setScans] = useState<ScanLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [action, setAction] = useState("");
+  const [result, setResult] = useState("");
   const [actorRole, setActorRole] = useState("");
   const [prescriptionId, setPrescriptionId] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [limit, setLimit] = useState(50);
+  const [limit, setLimit] = useState(20);
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
   const [exporting, setExporting] = useState(false);
@@ -28,13 +32,13 @@ export default function AuditPage() {
     }
 
     setLoading(true);
-    fetchAuditLogs(token, limit, offset)
+    fetchScanHistory(token, limit, offset)
       .then((response) => {
-        setLogs(response.logs);
+        setScans(response.scans);
         setTotal(response.total ?? 0);
       })
       .catch((err) => {
-        setError(err instanceof Error ? err.message : "Unable to load audit logs");
+        setError(err instanceof Error ? err.message : "Unable to load scan history");
       })
       .finally(() => {
         setLoading(false);
@@ -52,31 +56,31 @@ export default function AuditPage() {
     setError(null);
 
     try {
-      const response = await fetchAuditLogsFiltered(token, {
+      const response = await fetchScanHistoryFiltered(token, {
         limit,
         offset: 0,
-        action: action.trim() || undefined,
+        result: result || undefined,
         actorRole: actorRole || undefined,
         prescriptionId: prescriptionId.trim() || undefined,
         from: from || undefined,
         to: to || undefined
       });
-      setLogs(response.logs);
+      setScans(response.scans);
       setTotal(response.total ?? 0);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load audit logs");
+      setError(err instanceof Error ? err.message : "Unable to load scan history");
     } finally {
       setLoading(false);
     }
   };
 
   const clearFilters = () => {
-    setAction("");
+    setResult("");
     setActorRole("");
     setPrescriptionId("");
     setFrom("");
     setTo("");
-    setLimit(50);
+    setLimit(20);
     setOffset(0);
   };
 
@@ -87,10 +91,10 @@ export default function AuditPage() {
 
     setExporting(true);
     try {
-      const blob = await exportAuditCsv(token, {
+      const blob = await exportScanCsv(token, {
         limit,
         offset,
-        action: action.trim() || undefined,
+        result: result || undefined,
         actorRole: actorRole || undefined,
         prescriptionId: prescriptionId.trim() || undefined,
         from: from || undefined,
@@ -100,7 +104,7 @@ export default function AuditPage() {
       const anchor = document.createElement("a");
       const stamp = new Date().toISOString().slice(0, 10);
       anchor.href = url;
-      anchor.download = `audit-logs-${stamp}.csv`;
+      anchor.download = `scan-history-${stamp}.csv`;
       anchor.click();
       window.URL.revokeObjectURL(url);
     } catch (err) {
@@ -117,20 +121,23 @@ export default function AuditPage() {
           <DashboardHeader />
 
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-slate-900">Audit trail</h2>
+            <h2 className="text-xl font-semibold text-slate-900">Scan history</h2>
             <p className="text-sm text-slate-600">
-              Recent prescription activity and verification events.
+              Track QR verifications, results, and reasons.
             </p>
 
             <form className="mt-4 grid gap-3 rounded-xl border border-slate-200 p-4 md:grid-cols-3" onSubmit={applyFilters}>
               <label className="text-xs font-semibold text-slate-600">
-                Action
-                <input
+                Result
+                <select
                   className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                  value={action}
-                  onChange={(event) => setAction(event.target.value)}
-                  placeholder="PRESCRIPTION_CREATED"
-                />
+                  value={result}
+                  onChange={(event) => setResult(event.target.value)}
+                >
+                  <option value="">All</option>
+                  <option value="SUCCESS">SUCCESS</option>
+                  <option value="FAIL">FAIL</option>
+                </select>
               </label>
               <label className="text-xs font-semibold text-slate-600">
                 Actor role
@@ -219,40 +226,50 @@ export default function AuditPage() {
             ) : null}
 
             {loading ? (
-              <p className="mt-4 text-sm text-slate-500">Loading logs...</p>
+              <p className="mt-4 text-sm text-slate-500">Loading scan history...</p>
             ) : null}
 
-            {!loading && logs.length === 0 ? (
-              <p className="mt-4 text-sm text-slate-500">No audit activity yet.</p>
+            {!loading && scans.length === 0 ? (
+              <p className="mt-4 text-sm text-slate-500">No scans recorded yet.</p>
             ) : null}
 
             <div className="mt-4 space-y-3">
-              {logs.map((log) => (
-                <div key={log.id} className="rounded-xl border border-slate-200 p-4">
+              {scans.map((scan) => (
+                <div key={scan.id} className="rounded-xl border border-slate-200 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <p className="text-sm font-semibold text-slate-900">{log.action}</p>
+                      <p className="text-sm font-semibold text-slate-900">{scan.reason ?? "Scan"}</p>
                       <p className="text-xs text-slate-500">
-                        {new Date(log.createdAt).toLocaleString()}
+                        {new Date(scan.createdAt).toLocaleString()}
                       </p>
                     </div>
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs ${
-                        log.actorRole === "DOCTOR"
-                          ? "bg-emerald-50 text-emerald-700"
-                          : log.actorRole === "PHARMACIST"
-                          ? "bg-amber-50 text-amber-700"
-                          : log.actorRole === "PATIENT"
-                          ? "bg-blue-50 text-blue-700"
-                          : "bg-slate-100 text-slate-600"
-                      }`}
-                    >
-                      {log.actorRole}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs ${
+                          scan.result === "SUCCESS"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-rose-50 text-rose-700"
+                        }`}
+                      >
+                        {scan.result}
+                      </span>
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs ${
+                          scan.actorRole === "DOCTOR"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : scan.actorRole === "PHARMACIST"
+                            ? "bg-amber-50 text-amber-700"
+                            : scan.actorRole === "PATIENT"
+                            ? "bg-blue-50 text-blue-700"
+                            : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {scan.actorRole}
+                      </span>
+                    </div>
                   </div>
-                  <p className="mt-2 text-sm text-slate-700">{log.details ?? "No details"}</p>
                   <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                    Prescription ID: {log.prescriptionId}
+                    Prescription ID: {scan.prescriptionId ?? "Unknown"}
                   </div>
                 </div>
               ))}

@@ -37,6 +37,11 @@ export default function DashboardHeader() {
             </Link>
           ) : null}
           {user ? (
+            <Link className="rounded-lg border border-slate-200 px-3 py-1" href="/scans">
+              Scan history
+            </Link>
+          ) : null}
+          {user ? (
             <button
               className="rounded-lg border border-slate-200 px-3 py-1"
               type="button"

@@ -334,7 +334,13 @@ export default function DoctorPage() {
                     {scanHistory.map((scan) => (
                       <div key={scan.id} className="rounded-md bg-slate-50 px-2 py-1">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-semibold text-slate-700">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                              scan.result === "SUCCESS"
+                                ? "bg-emerald-50 text-emerald-700"
+                                : "bg-rose-50 text-rose-700"
+                            }`}
+                          >
                             {scan.result}
                           </span>
                           <span className="text-[10px] text-slate-500">
