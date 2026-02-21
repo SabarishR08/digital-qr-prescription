@@ -8,6 +8,7 @@ type AuditResponse = {
   total: number;
   limit: number;
   offset: number;
+  nextCursor?: string | null;
 };
 
 async function request<T>(path: string, options: RequestInit): Promise<T> {
@@ -29,8 +30,14 @@ async function request<T>(path: string, options: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function fetchAuditLogs(token: string, limit = 50, offset = 0) {
-  return request<AuditResponse>(`/audit/recent?limit=${limit}&offset=${offset}`, {
+export async function fetchAuditLogs(token: string, limit = 50, cursor?: string) {
+  const params = new URLSearchParams();
+  params.set("limit", String(limit));
+  if (cursor) {
+    params.set("cursor", cursor);
+  }
+
+  return request<AuditResponse>(`/audit/recent?${params.toString()}`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${token}`
@@ -40,12 +47,13 @@ export async function fetchAuditLogs(token: string, limit = 50, offset = 0) {
 
 type AuditFilters = {
   limit?: number;
-  offset?: number;
+  cursor?: string;
   action?: string;
   actorRole?: string;
   prescriptionId?: string;
   from?: string;
   to?: string;
+  q?: string;
 };
 
 export async function fetchAuditLogsFiltered(token: string, filters: AuditFilters) {
@@ -53,8 +61,8 @@ export async function fetchAuditLogsFiltered(token: string, filters: AuditFilter
   if (filters.limit) {
     params.set("limit", String(filters.limit));
   }
-  if (filters.offset) {
-    params.set("offset", String(filters.offset));
+  if (filters.cursor) {
+    params.set("cursor", filters.cursor);
   }
   if (filters.action) {
     params.set("action", filters.action);
@@ -70,6 +78,9 @@ export async function fetchAuditLogsFiltered(token: string, filters: AuditFilter
   }
   if (filters.to) {
     params.set("to", filters.to);
+  }
+  if (filters.q) {
+    params.set("q", filters.q);
   }
 
   return request<AuditResponse>(`/audit/recent?${params.toString()}`, {
@@ -82,12 +93,6 @@ export async function fetchAuditLogsFiltered(token: string, filters: AuditFilter
 
 export async function exportAuditCsv(token: string, filters: AuditFilters) {
   const params = new URLSearchParams();
-  if (filters.limit) {
-    params.set("limit", String(filters.limit));
-  }
-  if (filters.offset) {
-    params.set("offset", String(filters.offset));
-  }
   if (filters.action) {
     params.set("action", filters.action);
   }
@@ -102,6 +107,9 @@ export async function exportAuditCsv(token: string, filters: AuditFilters) {
   }
   if (filters.to) {
     params.set("to", filters.to);
+  }
+  if (filters.q) {
+    params.set("q", filters.q);
   }
 
   const response = await fetch(`${API_BASE}/audit/export?${params.toString()}`, {

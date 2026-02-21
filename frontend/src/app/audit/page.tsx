@@ -17,9 +17,10 @@ export default function AuditPage() {
   const [prescriptionId, setPrescriptionId] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [query, setQuery] = useState("");
   const [limit, setLimit] = useState(50);
-  const [offset, setOffset] = useState(0);
-  const [total, setTotal] = useState(0);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
@@ -28,10 +29,11 @@ export default function AuditPage() {
     }
 
     setLoading(true);
-    fetchAuditLogs(token, limit, offset)
+    fetchAuditLogs(token, limit)
       .then((response) => {
         setLogs(response.logs);
-        setTotal(response.total ?? 0);
+        setCursor(response.nextCursor ?? null);
+        setHasMore(Boolean(response.nextCursor));
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : "Unable to load audit logs");
@@ -39,7 +41,7 @@ export default function AuditPage() {
       .finally(() => {
         setLoading(false);
       });
-  }, [token, limit, offset]);
+  }, [token, limit]);
 
   const applyFilters = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -47,22 +49,25 @@ export default function AuditPage() {
       return;
     }
 
-    setOffset(0);
+    setCursor(null);
+    setHasMore(true);
     setLoading(true);
     setError(null);
 
     try {
       const response = await fetchAuditLogsFiltered(token, {
         limit,
-        offset: 0,
+        cursor: undefined,
         action: action.trim() || undefined,
         actorRole: actorRole || undefined,
         prescriptionId: prescriptionId.trim() || undefined,
         from: from || undefined,
-        to: to || undefined
+        to: to || undefined,
+        q: query.trim() || undefined
       });
       setLogs(response.logs);
-      setTotal(response.total ?? 0);
+      setCursor(response.nextCursor ?? null);
+      setHasMore(Boolean(response.nextCursor));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load audit logs");
     } finally {
@@ -76,8 +81,10 @@ export default function AuditPage() {
     setPrescriptionId("");
     setFrom("");
     setTo("");
+    setQuery("");
     setLimit(50);
-    setOffset(0);
+    setCursor(null);
+    setHasMore(true);
   };
 
   const downloadCsv = async () => {
@@ -88,13 +95,12 @@ export default function AuditPage() {
     setExporting(true);
     try {
       const blob = await exportAuditCsv(token, {
-        limit,
-        offset,
         action: action.trim() || undefined,
         actorRole: actorRole || undefined,
         prescriptionId: prescriptionId.trim() || undefined,
         from: from || undefined,
-        to: to || undefined
+        to: to || undefined,
+        q: query.trim() || undefined
       });
       const url = window.URL.createObjectURL(blob);
       const anchor = document.createElement("a");
@@ -123,6 +129,15 @@ export default function AuditPage() {
             </p>
 
             <form className="mt-4 grid gap-3 rounded-xl border border-slate-200 p-4 md:grid-cols-3" onSubmit={applyFilters}>
+              <label className="text-xs font-semibold text-slate-600 md:col-span-3">
+                Search
+                <input
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Prescription ID, actor email, or action"
+                />
+              </label>
               <label className="text-xs font-semibold text-slate-600">
                 Action
                 <input
@@ -183,7 +198,8 @@ export default function AuditPage() {
                   value={limit}
                   onChange={(event) => {
                     setLimit(Number(event.target.value));
-                    setOffset(0);
+                    setCursor(null);
+                    setHasMore(true);
                   }}
                 />
               </label>
@@ -258,29 +274,41 @@ export default function AuditPage() {
               ))}
             </div>
 
-            {!loading && total > limit ? (
+            {!loading && hasMore ? (
               <div className="mt-6 flex flex-wrap items-center justify-between gap-2 text-sm">
-                <span className="text-slate-500">
-                  Showing {offset + 1}–{Math.min(offset + limit, total)} of {total}
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    className="rounded-lg border border-slate-300 px-3 py-1"
-                    type="button"
-                    onClick={() => setOffset(Math.max(offset - limit, 0))}
-                    disabled={offset === 0}
-                  >
-                    Previous
-                  </button>
-                  <button
-                    className="rounded-lg border border-slate-300 px-3 py-1"
-                    type="button"
-                    onClick={() => setOffset(offset + limit)}
-                    disabled={offset + limit >= total}
-                  >
-                    Next
-                  </button>
-                </div>
+                <span className="text-slate-500">Loaded {logs.length} events</span>
+                <button
+                  className="rounded-lg border border-slate-300 px-3 py-1"
+                  type="button"
+                  onClick={async () => {
+                    if (!token || !cursor) {
+                      return;
+                    }
+                    setLoading(true);
+                    try {
+                      const response = await fetchAuditLogsFiltered(token, {
+                        limit,
+                        cursor,
+                        action: action.trim() || undefined,
+                        actorRole: actorRole || undefined,
+                        prescriptionId: prescriptionId.trim() || undefined,
+                        from: from || undefined,
+                        to: to || undefined,
+                        q: query.trim() || undefined
+                      });
+                      setLogs((prev) => [...prev, ...response.logs]);
+                      setCursor(response.nextCursor ?? null);
+                      setHasMore(Boolean(response.nextCursor));
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : "Unable to load more logs");
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  disabled={!cursor}
+                >
+                  Load more
+                </button>
               </div>
             ) : null}
           </div>

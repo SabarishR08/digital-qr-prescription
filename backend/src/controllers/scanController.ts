@@ -7,6 +7,8 @@ type ScanFilters = {
   where: Record<string, unknown>;
   take: number;
   skip: number;
+  cursor?: string;
+  q?: string;
 };
 
 function buildScanFilters(req: Request): ScanFilters {
@@ -14,6 +16,8 @@ function buildScanFilters(req: Request): ScanFilters {
   const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.min(limit, 200) : DEFAULT_LIMIT;
   const offset = Number(req.query.offset ?? 0);
   const safeOffset = Number.isFinite(offset) && offset >= 0 ? Math.min(offset, 10000) : 0;
+  const cursor = req.query.cursor ? String(req.query.cursor) : undefined;
+  const q = req.query.q ? String(req.query.q).trim() : undefined;
   const result = req.query.result ? String(req.query.result) : undefined;
   const prescriptionId = req.query.prescriptionId ? String(req.query.prescriptionId) : undefined;
   const actorRole = req.query.actorRole ? String(req.query.actorRole) : undefined;
@@ -46,7 +50,13 @@ function buildScanFilters(req: Request): ScanFilters {
     };
   }
 
-  return { where: baseWhere, take: safeLimit, skip: safeOffset };
+  return {
+    where: baseWhere,
+    take: safeLimit,
+    skip: cursor ? 1 : safeOffset,
+    cursor,
+    q
+  };
 }
 
 function escapeCsv(value: string) {
@@ -88,39 +98,63 @@ export async function getRecentScans(req: Request, res: Response) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const { where: baseWhere, take, skip } = buildScanFilters(req);
+  const { where: baseWhere, take, skip, cursor, q } = buildScanFilters(req);
+  let where = baseWhere as Record<string, unknown>;
+
+  if (q) {
+    const users = await prisma.user.findMany({
+      where: { email: { contains: q } },
+      select: { id: true }
+    });
+    const userIds = users.map((user) => user.id);
+    where = {
+      ...where,
+      OR: [
+        { prescriptionId: { contains: q } },
+        { actorRole: { contains: q } },
+        { actorId: { contains: q } },
+        { reason: { contains: q } },
+        { result: { contains: q } },
+        ...(userIds.length ? [{ actorId: { in: userIds } }] : [])
+      ]
+    };
+  }
+
+  const pagination = cursor ? { cursor: { id: cursor }, skip } : { skip };
 
   if (req.user.role === "ADMIN") {
     const [scans, total] = await Promise.all([
       prisma.scanLog.findMany({
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         take,
-        skip,
-        where: baseWhere,
+        ...pagination,
+        where,
         include: { prescription: true }
       }),
-      prisma.scanLog.count({ where: baseWhere })
+      prisma.scanLog.count({ where })
     ]);
 
-    return res.json({ scans, total, limit: take, offset: skip });
+    const nextCursor = scans.length === take ? scans[scans.length - 1]?.id : null;
+    return res.json({ scans, total, limit: take, offset: skip, nextCursor });
   }
 
   const where = {
-    ...baseWhere,
+    ...where,
     actorId: req.user.sub
   };
   const [scans, total] = await Promise.all([
     prisma.scanLog.findMany({
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take,
-      skip,
+      ...pagination,
       where,
       include: { prescription: true }
     }),
     prisma.scanLog.count({ where })
   ]);
 
-  return res.json({ scans, total, limit: take, offset: skip });
+  const nextCursor = scans.length === take ? scans[scans.length - 1]?.id : null;
+  return res.json({ scans, total, limit: take, offset: skip, nextCursor });
 }
 
 export async function exportScanCsv(req: Request, res: Response) {
@@ -128,24 +162,43 @@ export async function exportScanCsv(req: Request, res: Response) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const { where: baseWhere, take, skip } = buildScanFilters(req);
+  const { where: baseWhere, q } = buildScanFilters(req);
+  let where = baseWhere as Record<string, unknown>;
+
+  if (q) {
+    const users = await prisma.user.findMany({
+      where: { email: { contains: q } },
+      select: { id: true }
+    });
+    const userIds = users.map((user) => user.id);
+    where = {
+      ...where,
+      OR: [
+        { prescriptionId: { contains: q } },
+        { actorRole: { contains: q } },
+        { actorId: { contains: q } },
+        { reason: { contains: q } },
+        { result: { contains: q } },
+        ...(userIds.length ? [{ actorId: { in: userIds } }] : [])
+      ]
+    };
+  }
+
   const shared = {
-    orderBy: { createdAt: "desc" },
-    take,
-    skip
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }]
   } as const;
 
   let scans;
   if (req.user.role === "ADMIN") {
     scans = await prisma.scanLog.findMany({
       ...shared,
-      where: baseWhere
+      where
     });
   } else {
     scans = await prisma.scanLog.findMany({
       ...shared,
       where: {
-        ...baseWhere,
+        ...where,
         actorId: req.user.sub
       }
     });

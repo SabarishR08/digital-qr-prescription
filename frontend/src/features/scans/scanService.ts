@@ -8,6 +8,7 @@ type ScanResponse = {
   total: number;
   limit: number;
   offset: number;
+  nextCursor?: string | null;
 };
 
 async function request<T>(path: string, options: RequestInit): Promise<T> {
@@ -29,8 +30,14 @@ async function request<T>(path: string, options: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function fetchScanHistory(token: string, limit = 10, offset = 0) {
-  return request<ScanResponse>(`/scans/recent?limit=${limit}&offset=${offset}`, {
+export async function fetchScanHistory(token: string, limit = 10, cursor?: string) {
+  const params = new URLSearchParams();
+  params.set("limit", String(limit));
+  if (cursor) {
+    params.set("cursor", cursor);
+  }
+
+  return request<ScanResponse>(`/scans/recent?${params.toString()}`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${token}`
@@ -40,12 +47,13 @@ export async function fetchScanHistory(token: string, limit = 10, offset = 0) {
 
 type ScanFilters = {
   limit?: number;
-  offset?: number;
+  cursor?: string;
   result?: string;
   prescriptionId?: string;
   actorRole?: string;
   from?: string;
   to?: string;
+  q?: string;
 };
 
 export async function fetchScanHistoryFiltered(token: string, filters: ScanFilters) {
@@ -53,8 +61,8 @@ export async function fetchScanHistoryFiltered(token: string, filters: ScanFilte
   if (filters.limit) {
     params.set("limit", String(filters.limit));
   }
-  if (filters.offset) {
-    params.set("offset", String(filters.offset));
+  if (filters.cursor) {
+    params.set("cursor", filters.cursor);
   }
   if (filters.result) {
     params.set("result", filters.result);
@@ -70,6 +78,9 @@ export async function fetchScanHistoryFiltered(token: string, filters: ScanFilte
   }
   if (filters.to) {
     params.set("to", filters.to);
+  }
+  if (filters.q) {
+    params.set("q", filters.q);
   }
 
   return request<ScanResponse>(`/scans/recent?${params.toString()}`, {
@@ -82,12 +93,6 @@ export async function fetchScanHistoryFiltered(token: string, filters: ScanFilte
 
 export async function exportScanCsv(token: string, filters: ScanFilters) {
   const params = new URLSearchParams();
-  if (filters.limit) {
-    params.set("limit", String(filters.limit));
-  }
-  if (filters.offset) {
-    params.set("offset", String(filters.offset));
-  }
   if (filters.result) {
     params.set("result", filters.result);
   }
@@ -102,6 +107,9 @@ export async function exportScanCsv(token: string, filters: ScanFilters) {
   }
   if (filters.to) {
     params.set("to", filters.to);
+  }
+  if (filters.q) {
+    params.set("q", filters.q);
   }
 
   const response = await fetch(`${API_BASE}/scans/export?${params.toString()}`, {
