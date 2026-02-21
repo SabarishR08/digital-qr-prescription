@@ -46,6 +46,27 @@ export default function DoctorPage() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable) {
+        return;
+      }
+      if (event.ctrlKey && event.key.toLowerCase() === "e") {
+        event.preventDefault();
+        downloadScanCsv();
+      }
+      if (event.ctrlKey && event.key.toLowerCase() === "r") {
+        event.preventDefault();
+        loadScanHistory();
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [token]);
+
   const loadScanHistory = async () => {
     if (!token) {
       return;

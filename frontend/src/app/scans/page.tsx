@@ -29,6 +29,7 @@ export default function ScansPage() {
   const [isInteracting, setIsInteracting] = useState(false);
   const [refreshEnabled, setRefreshEnabled] = useState(true);
   const [refreshInterval, setRefreshInterval] = useState(15000);
+  const [pinnedVisible, setPinnedVisible] = useState(true);
   const interactionTimerRef = useRef<number | null>(null);
 
   const refreshScans = async () => {
@@ -107,6 +108,27 @@ export default function ScansPage() {
 
     return () => window.clearInterval(interval);
   }, [token, isInteracting, loading, exporting, refreshEnabled, refreshInterval, limit, result, actorRole, prescriptionId, from, to, query]);
+
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable) {
+        return;
+      }
+      if (event.ctrlKey && event.key.toLowerCase() === "e") {
+        event.preventDefault();
+        downloadCsv();
+      }
+      if (event.ctrlKey && event.key.toLowerCase() === "r") {
+        event.preventDefault();
+        refreshScans();
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [limit, result, actorRole, prescriptionId, from, to, query, token]);
 
   const applyFilters = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -193,7 +215,7 @@ export default function ScansPage() {
     <RoleGuard>
       <main className="min-h-screen bg-slate-50 p-8">
         <section className="mx-auto max-w-5xl space-y-6">
-          <DashboardHeader />
+          <DashboardHeader liveModeActive={refreshEnabled} />
 
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-xl font-semibold text-slate-900">Scan history</h2>
@@ -325,6 +347,14 @@ export default function ScansPage() {
                     />
                     Auto-refresh
                   </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={pinnedVisible}
+                      onChange={(event) => setPinnedVisible(event.target.checked)}
+                    />
+                    Pin latest
+                  </label>
                   <select
                     className="rounded-md border border-slate-200 px-2 py-1 text-xs"
                     value={refreshInterval}
@@ -444,9 +474,16 @@ export default function ScansPage() {
             ) : null}
           </div>
 
-          {scans.length ? (
-            <div className="pointer-events-none fixed bottom-6 right-6 max-w-xs rounded-2xl border border-slate-200 bg-white p-4 shadow-lg">
+          {scans.length && pinnedVisible ? (
+            <div className="fixed bottom-6 right-6 z-20 max-w-xs rounded-2xl border border-slate-200 bg-white p-4 shadow-lg">
               <p className="text-xs uppercase tracking-wide text-slate-400">Latest scan</p>
+              <button
+                className="absolute right-3 top-3 text-[10px] text-slate-400"
+                type="button"
+                onClick={() => setPinnedVisible(false)}
+              >
+                Close
+              </button>
               <div className="mt-2 flex items-center justify-between gap-2">
                 <span
                   className={`rounded-full px-2 py-1 text-xs font-semibold ${

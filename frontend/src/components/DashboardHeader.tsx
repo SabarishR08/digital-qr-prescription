@@ -3,7 +3,11 @@
 import Link from "next/link";
 import { useAuth } from "../features/auth/AuthContext";
 
-export default function DashboardHeader() {
+type DashboardHeaderProps = {
+  liveModeActive?: boolean;
+};
+
+export default function DashboardHeader({ liveModeActive }: DashboardHeaderProps) {
   const { user, logout } = useAuth();
 
   return (
@@ -11,9 +15,20 @@ export default function DashboardHeader() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-wide text-slate-500">QR Prescription</p>
-          <h1 className="text-lg font-semibold text-slate-900">
-            {user ? `${user.fullName} · ${user.role}` : "Workspace"}
-          </h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-lg font-semibold text-slate-900">
+              {user ? `${user.fullName} · ${user.role}` : "Workspace"}
+            </h1>
+            {liveModeActive !== undefined ? (
+              <span
+                className={`rounded-full px-2 py-1 text-[10px] font-semibold ${
+                  liveModeActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"
+                }`}
+              >
+                {liveModeActive ? "Live" : "Paused"}
+              </span>
+            ) : null}
+          </div>
         </div>
         <nav className="flex flex-wrap items-center gap-2 text-sm">
           {user?.role === "DOCTOR" ? (

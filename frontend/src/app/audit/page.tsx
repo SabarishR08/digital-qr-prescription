@@ -104,6 +104,27 @@ export default function AuditPage() {
     return () => window.clearInterval(interval);
   }, [token, isInteracting, loading, exporting, refreshEnabled, refreshInterval, limit, action, actorRole, prescriptionId, from, to, query]);
 
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable) {
+        return;
+      }
+      if (event.ctrlKey && event.key.toLowerCase() === "e") {
+        event.preventDefault();
+        downloadCsv();
+      }
+      if (event.ctrlKey && event.key.toLowerCase() === "r") {
+        event.preventDefault();
+        refreshLogs();
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [limit, action, actorRole, prescriptionId, from, to, query, token]);
+
   const applyFilters = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!token) {
@@ -189,7 +210,7 @@ export default function AuditPage() {
     <RoleGuard>
       <main className="min-h-screen bg-slate-50 p-8">
         <section className="mx-auto max-w-5xl space-y-6">
-          <DashboardHeader />
+          <DashboardHeader liveModeActive={refreshEnabled} />
 
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-xl font-semibold text-slate-900">Audit trail</h2>
