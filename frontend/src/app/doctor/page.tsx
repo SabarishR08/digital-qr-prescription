@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import RoleGuard from "../../components/RoleGuard";
 import DashboardHeader from "../../components/DashboardHeader";
 import QrScanner from "../../components/QrScanner";
@@ -26,8 +26,31 @@ export default function DoctorPage() {
   const [verifyPayload, setVerifyPayload] = useState("");
   const [verifyResult, setVerifyResult] = useState<Prescription | null>(null);
   const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [scanHistory, setScanHistory] = useState<string[]>([]);
+  const [toast, setToast] = useState<string | null>(null);
+  const [lastScan, setLastScan] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!toast) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setToast(null), 2500);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  const handleScan = (text: string) => {
+    if (text === lastScan) {
+      return;
+    }
+
+    setLastScan(text);
+    setVerifyPayload(text);
+    setScanHistory((prev) => [text, ...prev].slice(0, 5));
+    setToast("QR captured");
+  };
 
   const updateMedication = (index: number, field: keyof Medication, value: string) => {
     setMedications((prev) =>
@@ -263,8 +286,25 @@ export default function DoctorPage() {
               <h2 className="text-lg font-semibold text-slate-900">Scan with camera</h2>
               <p className="text-xs text-slate-500">Scans fill the QR payload input.</p>
               <div className="mt-4">
-                <QrScanner onResult={setVerifyPayload} />
+                <QrScanner onResult={handleScan} />
               </div>
+              {toast ? (
+                <div className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                  {toast}
+                </div>
+              ) : null}
+              {scanHistory.length ? (
+                <div className="mt-4 text-xs text-slate-600">
+                  Recent scans:
+                  <div className="mt-2 space-y-2">
+                    {scanHistory.map((scan, index) => (
+                      <div key={`${scan}-${index}`} className="truncate rounded-md bg-slate-50 px-2 py-1">
+                        {scan}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </section>
         </section>

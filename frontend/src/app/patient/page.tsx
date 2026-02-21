@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import RoleGuard from "../../components/RoleGuard";
 import DashboardHeader from "../../components/DashboardHeader";
 import QrScanner from "../../components/QrScanner";
@@ -14,6 +14,29 @@ export default function PatientPage() {
   const [result, setResult] = useState<Prescription | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [scanHistory, setScanHistory] = useState<string[]>([]);
+  const [toast, setToast] = useState<string | null>(null);
+  const [lastScan, setLastScan] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!toast) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setToast(null), 2500);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  const handleScan = (text: string) => {
+    if (text === lastScan) {
+      return;
+    }
+
+    setLastScan(text);
+    setQrPayload(text);
+    setScanHistory((prev) => [text, ...prev].slice(0, 5));
+    setToast("QR captured");
+  };
 
   const handleVerify = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -72,8 +95,25 @@ export default function PatientPage() {
             <h2 className="text-lg font-semibold text-slate-900">Scan with camera</h2>
             <p className="text-xs text-slate-500">Scans fill the QR payload field.</p>
             <div className="mt-4">
-              <QrScanner onResult={setQrPayload} />
+              <QrScanner onResult={handleScan} />
             </div>
+            {toast ? (
+              <div className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                {toast}
+              </div>
+            ) : null}
+            {scanHistory.length ? (
+              <div className="mt-4 text-xs text-slate-600">
+                Recent scans:
+                <div className="mt-2 space-y-2">
+                  {scanHistory.map((scan, index) => (
+                    <div key={`${scan}-${index}`} className="truncate rounded-md bg-slate-50 px-2 py-1">
+                      {scan}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
 
           {result ? (

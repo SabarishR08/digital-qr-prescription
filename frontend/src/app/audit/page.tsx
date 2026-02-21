@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import RoleGuard from "../../components/RoleGuard";
 import DashboardHeader from "../../components/DashboardHeader";
 import { useAuth } from "../../features/auth/AuthContext";
-import { fetchAuditLogs } from "../../features/audit/auditService";
+import { fetchAuditLogs, fetchAuditLogsFiltered } from "../../features/audit/auditService";
 import type { AuditLog } from "../../features/audit/types";
 
 export default function AuditPage() {
@@ -12,6 +12,12 @@ export default function AuditPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [action, setAction] = useState("");
+  const [actorRole, setActorRole] = useState("");
+  const [prescriptionId, setPrescriptionId] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [limit, setLimit] = useState(50);
 
   useEffect(() => {
     if (!token) {
@@ -31,6 +37,41 @@ export default function AuditPage() {
       });
   }, [token]);
 
+  const applyFilters = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!token) {
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetchAuditLogsFiltered(token, {
+        limit,
+        action: action.trim() || undefined,
+        actorRole: actorRole || undefined,
+        prescriptionId: prescriptionId.trim() || undefined,
+        from: from || undefined,
+        to: to || undefined
+      });
+      setLogs(response.logs);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load audit logs");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const clearFilters = () => {
+    setAction("");
+    setActorRole("");
+    setPrescriptionId("");
+    setFrom("");
+    setTo("");
+    setLimit(50);
+  };
+
   return (
     <RoleGuard>
       <main className="min-h-screen bg-slate-50 p-8">
@@ -42,6 +83,85 @@ export default function AuditPage() {
             <p className="text-sm text-slate-600">
               Recent prescription activity and verification events.
             </p>
+
+            <form className="mt-4 grid gap-3 rounded-xl border border-slate-200 p-4 md:grid-cols-3" onSubmit={applyFilters}>
+              <label className="text-xs font-semibold text-slate-600">
+                Action
+                <input
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  value={action}
+                  onChange={(event) => setAction(event.target.value)}
+                  placeholder="PRESCRIPTION_CREATED"
+                />
+              </label>
+              <label className="text-xs font-semibold text-slate-600">
+                Actor role
+                <select
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  value={actorRole}
+                  onChange={(event) => setActorRole(event.target.value)}
+                >
+                  <option value="">All roles</option>
+                  <option value="DOCTOR">DOCTOR</option>
+                  <option value="PATIENT">PATIENT</option>
+                  <option value="PHARMACIST">PHARMACIST</option>
+                  <option value="ADMIN">ADMIN</option>
+                </select>
+              </label>
+              <label className="text-xs font-semibold text-slate-600">
+                Prescription ID
+                <input
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  value={prescriptionId}
+                  onChange={(event) => setPrescriptionId(event.target.value)}
+                  placeholder="cuid..."
+                />
+              </label>
+              <label className="text-xs font-semibold text-slate-600">
+                From
+                <input
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  type="date"
+                  value={from}
+                  onChange={(event) => setFrom(event.target.value)}
+                />
+              </label>
+              <label className="text-xs font-semibold text-slate-600">
+                To
+                <input
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  type="date"
+                  value={to}
+                  onChange={(event) => setTo(event.target.value)}
+                />
+              </label>
+              <label className="text-xs font-semibold text-slate-600">
+                Limit
+                <input
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  type="number"
+                  min={10}
+                  max={200}
+                  value={limit}
+                  onChange={(event) => setLimit(Number(event.target.value))}
+                />
+              </label>
+              <div className="flex items-end gap-2">
+                <button
+                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+                  type="submit"
+                >
+                  Apply filters
+                </button>
+                <button
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+                  type="button"
+                  onClick={clearFilters}
+                >
+                  Clear
+                </button>
+              </div>
+            </form>
 
             {error ? (
               <p className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
