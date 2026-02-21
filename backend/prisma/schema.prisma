@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  role         String
+  fullName     String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  prescriptions Prescription[] @relation("DoctorPrescriptions")
+  refreshTokens RefreshToken[]
+}
+
+model Prescription {
+  id           String   @id @default(cuid())
+  doctorId     String
+  patientName  String
+  patientEmail String
+  medications  String
+  notes        String?
+  qrPayload    String
+  status       String   @default("ACTIVE")
+  expiresAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  doctor       User     @relation("DoctorPrescriptions", fields: [doctorId], references: [id])
+  auditLogs    AuditLog[]
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  prescriptionId String
+  actorRole      String
+  actorId        String?
+  action         String
+  details        String?
+  createdAt      DateTime @default(now())
+  prescription   Prescription @relation(fields: [prescriptionId], references: [id])
+}
+
+model RefreshToken {
+  id         String   @id @default(cuid())
+  userId     String
+  tokenHash  String
+  revokedAt  DateTime?
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+}
