@@ -5,14 +5,6 @@ import prisma from "../config/prisma";
 import { createQrPayload, verifyQrPayload } from "../utils/qrPayload";
 import { generateQrCodeDataUrl } from "../utils/qrCode";
 
-function parseMedications(value: string) {
-  try {
-    return JSON.parse(value);
-  } catch {
-    return [];
-  }
-}
-
 const medicationSchema = z.object({
   name: z.string().min(1),
   dosage: z.string().min(1),
@@ -48,7 +40,12 @@ export async function createPrescription(req: Request, res: Response) {
       patientName: parsed.data.patientName,
       patientEmail: parsed.data.patientEmail,
       notes: parsed.data.notes,
-      medications: JSON.stringify(parsed.data.medications),
+      medications: {
+        create: parsed.data.medications.map((medication, index) => ({
+          ...medication,
+          position: index
+        }))
+      },
       qrPayload: "",
       expiresAt
     }
@@ -61,6 +58,11 @@ export async function createPrescription(req: Request, res: Response) {
     where: { id: prescription.id },
     data: {
       qrPayload
+    },
+    include: {
+      medications: {
+        orderBy: { position: "asc" }
+      }
     }
   });
 
@@ -77,8 +79,7 @@ export async function createPrescription(req: Request, res: Response) {
 
   return res.status(201).json({
     prescription: {
-      ...updated,
-      medications: parseMedications(updated.medications)
+      ...updated
     },
     qrCode
   });
@@ -88,7 +89,18 @@ const verifySchema = z.object({
   qrPayload: z.string().min(10)
 });
 
+const listSchema = z.object({
+  cursor: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  includeQr: z.coerce.boolean().optional()
+});
+
 export async function listPrescriptions(req: Request, res: Response) {
+  const parsedQuery = listSchema.safeParse(req.query);
+  if (!parsedQuery.success) {
+    return res.status(400).json({ error: "Invalid query", details: parsedQuery.error.flatten() });
+  }
+
   if (!req.user) {
     return res.status(401).json({ error: "Unauthorized" });
   }
@@ -102,19 +114,31 @@ export async function listPrescriptions(req: Request, res: Response) {
     return res.status(403).json({ error: "Insufficient permissions" });
   }
 
+  const limit = parsedQuery.data.limit ?? 20;
+  const cursor = parsedQuery.data.cursor;
+  const includeQr = parsedQuery.data.includeQr ?? false;
+
   const prescriptions = await prisma.prescription.findMany({
     where,
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }]
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: limit + 1,
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    include: {
+      medications: {
+        orderBy: { position: "asc" }
+      }
+    }
   });
 
-  const includeQr = String(req.query.includeQr ?? "").toLowerCase() === "true";
+  const hasMore = prescriptions.length > limit;
+  const page = hasMore ? prescriptions.slice(0, limit) : prescriptions;
+  const nextCursor = hasMore ? prescriptions[limit].id : null;
   const allowQr = includeQr || req.user.role === "PATIENT";
 
   const payload = await Promise.all(
-    prescriptions.map(async (prescription) => {
+    page.map(async (prescription) => {
       const base = {
-        ...prescription,
-        medications: parseMedications(prescription.medications)
+        ...prescription
       };
       if (!allowQr) {
         return base;
@@ -128,7 +152,7 @@ export async function listPrescriptions(req: Request, res: Response) {
     })
   );
 
-  return res.json({ prescriptions: payload });
+  return res.json({ prescriptions: payload, nextCursor });
 }
 
 export async function verifyPrescription(req: Request, res: Response) {
@@ -170,7 +194,12 @@ export async function verifyPrescription(req: Request, res: Response) {
   }
 
   const prescription = await prisma.prescription.findUnique({
-    where: { id: payload.prescriptionId }
+    where: { id: payload.prescriptionId },
+    include: {
+      medications: {
+        orderBy: { position: "asc" }
+      }
+    }
   });
 
   if (!prescription) {
@@ -296,7 +325,14 @@ export async function verifyPrescription(req: Request, res: Response) {
       return res.status(409).json({ error: "Prescription already redeemed" });
     }
 
-    const refreshed = await prisma.prescription.findUnique({ where: { id: prescription.id } });
+    const refreshed = await prisma.prescription.findUnique({
+      where: { id: prescription.id },
+      include: {
+        medications: {
+          orderBy: { position: "asc" }
+        }
+      }
+    });
     if (refreshed) {
       resolvedPrescription = refreshed;
     }
@@ -326,8 +362,7 @@ export async function verifyPrescription(req: Request, res: Response) {
 
   return res.json({
     prescription: {
-      ...resolvedPrescription,
-      medications: parseMedications(resolvedPrescription.medications)
+      ...resolvedPrescription
     }
   });
 }

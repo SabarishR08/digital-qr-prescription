@@ -11,7 +11,11 @@ export default function PatientPage() {
   const { token } = useAuth();
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const pageSize = 8;
 
   useEffect(() => {
     if (!token) {
@@ -24,9 +28,14 @@ export default function PatientPage() {
       setLoading(true);
       setError(null);
       try {
-        const response = await fetchMyPrescriptions(token, true);
+        const response = await fetchMyPrescriptions(token, {
+          includeQr: true,
+          limit: pageSize
+        });
         if (active) {
           setPrescriptions(response.prescriptions);
+          setNextCursor(response.nextCursor ?? null);
+          setHasMore(Boolean(response.nextCursor));
         }
       } catch (err) {
         if (active) {
@@ -45,6 +54,28 @@ export default function PatientPage() {
       active = false;
     };
   }, [token]);
+
+  const loadMore = async () => {
+    if (!token || !nextCursor || loadingMore) {
+      return;
+    }
+
+    setLoadingMore(true);
+    try {
+      const response = await fetchMyPrescriptions(token, {
+        includeQr: true,
+        limit: pageSize,
+        cursor: nextCursor
+      });
+      setPrescriptions((prev) => [...prev, ...response.prescriptions]);
+      setNextCursor(response.nextCursor ?? null);
+      setHasMore(Boolean(response.nextCursor));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load more prescriptions");
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const now = useMemo(() => new Date(), []);
 
@@ -129,6 +160,19 @@ export default function PatientPage() {
                 );
               })}
             </div>
+
+            {hasMore ? (
+              <div className="mt-6 flex justify-center">
+                <button
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-900 disabled:opacity-60"
+                  type="button"
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? "Loading..." : "Load more"}
+                </button>
+              </div>
+            ) : null}
           </div>
         </section>
       </main>

@@ -27,7 +27,6 @@ model Prescription {
   doctorId     String
   patientName  String
   patientEmail String
-  medications  String
   notes        String?
   qrPayload    String
   status       String   @default("ACTIVE")
@@ -38,6 +37,7 @@ model Prescription {
   updatedAt    DateTime @updatedAt
   doctor       User     @relation("DoctorPrescriptions", fields: [doctorId], references: [id])
   redeemedBy   User?    @relation("PrescriptionRedeemer", fields: [redeemedById], references: [id])
+  medications  Medication[]
   auditLogs    AuditLog[]
   scanLogs     ScanLog[]
   
@@ -46,6 +46,21 @@ model Prescription {
   @@index([status])
   @@index([expiresAt])
   @@index([createdAt])
+}
+
+model Medication {
+  id             String   @id @default(cuid())
+  prescriptionId String
+  name           String
+  dosage         String
+  frequency      String
+  duration       String
+  position       Int
+  createdAt      DateTime @default(now())
+  prescription   Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+
+  @@index([prescriptionId])
+  @@index([prescriptionId, position])
 }
 
 model AuditLog {

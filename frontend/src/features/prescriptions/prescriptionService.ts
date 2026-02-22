@@ -22,6 +22,7 @@ type VerifyResponse = {
 
 type ListResponse = {
   prescriptions: Prescription[];
+  nextCursor?: string | null;
 };
 
 async function request<T>(path: string, options: RequestInit): Promise<T> {
@@ -63,10 +64,25 @@ export async function verifyPrescription(token: string, qrPayload: string) {
   });
 }
 
-export async function fetchMyPrescriptions(token: string, includeQr = true) {
+export async function fetchMyPrescriptions(
+  token: string,
+  options: {
+    includeQr?: boolean;
+    limit?: number;
+    cursor?: string | null;
+  } = {}
+) {
   const params = new URLSearchParams();
+  const includeQr = options.includeQr ?? true;
+
   if (includeQr) {
     params.set("includeQr", "true");
+  }
+  if (options.limit) {
+    params.set("limit", String(options.limit));
+  }
+  if (options.cursor) {
+    params.set("cursor", options.cursor);
   }
 
   const suffix = params.toString();
