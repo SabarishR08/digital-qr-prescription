@@ -299,5 +299,4 @@ Sabarish R
 
 ---
 
-Origin: Ideathon Hackathon — self-defined problem statement.  
-Nov 2024
+Origin: Ideathon Hackathon (self-defined problem) — Nov 2024
