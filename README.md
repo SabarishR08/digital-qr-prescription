@@ -15,7 +15,7 @@ Secure prescription platform with cryptographically signed QR codes, role-based 
 
 Traditional prescriptions (paper or digital) have fundamental security issues:
 
-- No way to verify authenticity � easy to forge or modify
+- No way to verify authenticity – easy to forge or modify
 - Pharmacies cannot validate that a prescription is real in real-time
 - No central audit trail for compliance investigations
 - No expiration enforcement
@@ -27,12 +27,12 @@ Healthcare systems need a tamper-proof, verifiable, and auditable prescription m
 
 This system provides:
 
-- **Cryptographically signed QR codes** � HMAC-SHA256 signatures locked to each prescription
-- **Tamper detection** � Invalid or modified QR codes are rejected
-- **Expiration enforcement** � Prescriptions expire and cannot be redeemed after expiry
-- **Replay prevention** � Prescriptions can only be redeemed once (atomic status check)
-- **Complete audit trail** � Every verification attempt (success and failure) is logged
-- **Role-based access** � Doctors create, patients view, pharmacists verify, admins audit
+- **Cryptographically signed QR codes** – HMAC-SHA256 signatures locked to each prescription
+- **Tamper detection** – Invalid or modified QR codes are rejected
+- **Expiration enforcement** – Prescriptions expire and cannot be redeemed after expiry
+- **Replay prevention** – Prescriptions can only be redeemed once (atomic status check)
+- **Complete audit trail** – Every verification attempt (success and failure) is logged
+- **Role-based access** – Doctors create, patients view, pharmacists verify, admins audit
 
 ## What's Implemented
 
@@ -124,13 +124,13 @@ npm run dev
 ## Scripts
 
 **Backend:**
-- `npm run dev` � Start dev server with hot reload
-- `npm run build` � Compile to dist
-- `npm run prisma:migrate` � Create and apply migrations
+- `npm run dev` – Start dev server with hot reload
+- `npm run build` – Compile to dist
+- `npm run prisma:migrate` – Create and apply migrations
 
 **Frontend:**
-- `npm run dev` � Start dev server on port 3000
-- `npm run build` � Build for production
+- `npm run dev` – Start dev server on port 3000
+- `npm run build` – Build for production
 
 ## Security
 
@@ -145,15 +145,15 @@ npm run dev
 ### What Gets Logged
 
 Every verification attempt generates:
-- **ScanLog entry** � Technical record (actor, result, reason)
-- **AuditLog entry** � Business record (action, result, details)
+- **ScanLog entry** – Technical record (actor, result, reason)
+- **AuditLog entry** – Business record (action, result, details)
 
 Failure reasons logged:
-- `INVALID_OR_EXPIRED` � QR signature failed verification
-- `NOT_FOUND` � Prescription ID not found
-- `EXPIRED` � Prescription past expiration date
-- `ALREADY_REDEEMED` � Prescription already used
-- `RACE_CONDITION` � Concurrent redemption attempt
+- `INVALID_OR_EXPIRED` – QR signature failed verification
+- `NOT_FOUND` – Prescription ID not found
+- `EXPIRED` – Prescription past expiration date
+- `ALREADY_REDEEMED` – Prescription already used
+- `RACE_CONDITION` – Concurrent redemption attempt
 
 ### Rate Limiting
 
@@ -163,14 +163,14 @@ Failure reasons logged:
 ### Database Indexes
 
 Indexes on:
-- `Prescription.doctorId` � Doctor's prescriptions
-- `Prescription.patientEmail` � Patient's prescriptions
-- `Prescription.status` � Active/redeemed filtering
-- `Prescription.expiresAt` � Expiration checks
-- `AuditLog.prescriptionId` � Audit trail per prescription
-- `AuditLog.actorId` � User activity tracking
-- `ScanLog.prescriptionId` � Scan history per prescription
-- `ScanLog.actorId` � Actor-scoped filtering
+- `Prescription.doctorId` – Doctor's prescriptions
+- `Prescription.patientEmail` – Patient's prescriptions
+- `Prescription.status` – Active/redeemed filtering
+- `Prescription.expiresAt` – Expiration checks
+- `AuditLog.prescriptionId` – Audit trail per prescription
+- `AuditLog.actorId` – User activity tracking
+- `ScanLog.prescriptionId` – Scan history per prescription
+- `ScanLog.actorId` – Actor-scoped filtering
 
 ## API Overview
 
@@ -236,7 +236,7 @@ To verify a prescription locally:
 1. Doctor creates prescription via `/prescriptions`
 2. Copy `qrPayload` from response
 3. Pharmacist calls `/prescriptions/verify` with payload
-4. Check audit log via `/audit` � should show `action: QR_VERIFIED, result: SUCCESS`
+4. Check audit log via `/audit` – should show `action: QR_VERIFIED, result: SUCCESS`
 
 ## Design Decisions
 
@@ -244,7 +244,7 @@ To verify a prescription locally:
 
 QR payload is signed with HMAC (not JWT) because:
 - Smaller codec (no base64 padding)
-- QR codes are small � no room for key ID or algorithm in payload
+- QR codes are small – no room for key ID or algorithm in payload
 - Nonce + expiration timestamp prevent replay
 
 ### Why Cursor Pagination?
