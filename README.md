@@ -9,7 +9,9 @@
 ![Prisma](https://img.shields.io/badge/Prisma-2D3748?logo=prisma&logoColor=fff)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-06B6D4?logo=tailwind-css&logoColor=fff)
 
-Secure prescription platform with cryptographically signed QR codes, role-based workflows, and full audit logging.
+**Status:** Active Development
+
+QR-based prescription system with signed payload verification and audit logging.
 
 ## Problem
 
@@ -34,7 +36,7 @@ This system provides:
 - **Complete audit trail** – Every verification attempt (success and failure) is logged
 - **Role-based access** – Doctors create, patients view, pharmacists verify, admins audit
 
-## What's Implemented
+## Implemented Features
 
 - Prescription CRUD with JWT authentication
 - QR code generation and verification (HMAC-SHA256 signed payloads)
@@ -297,4 +299,5 @@ Sabarish R
 
 ---
 
-Built for Ideathon Hackathon — problem independently defined and developed further.
+Origin: Ideathon Hackathon — self-defined problem statement.  
+Nov 2024
