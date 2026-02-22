@@ -1,5 +1,14 @@
 # Digital QR Prescription System
 
+![Next.js](https://img.shields.io/badge/Next.js%2014-000?logo=next.js)
+![React](https://img.shields.io/badge/React%2018-61DAFB?logo=react&logoColor=000)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=fff)
+![Node.js](https://img.shields.io/badge/Node.js-339933?logo=node.js&logoColor=fff)
+![Express](https://img.shields.io/badge/Express-000?logo=express)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?logo=postgresql&logoColor=fff)
+![Prisma](https://img.shields.io/badge/Prisma-2D3748?logo=prisma&logoColor=fff)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-06B6D4?logo=tailwind-css&logoColor=fff)
+
 Secure prescription platform with cryptographically signed QR codes, role-based workflows, and full audit logging.
 
 ## Problem
