@@ -1,4 +1,76 @@
-# Digital QR Prescription System
+# Digital Qr Prescription
+
+![License](https://img.shields.io/badge/license-MIT-green) ![Language](https://img.shields.io/badge/language-TypeScript-informational) ![Docker](https://img.shields.io/badge/docker-ready-2496ed)
+
+
+## 📌 Overview
+
+A platform for secure, encrypted prescriptions with QR codes, role-based access for doctors, patients, and pharmacists, and a full audit trail.
+
+## 🏗️ Architecture
+
+```text
+Next.js, React   (frontend)
+     │   REST / WebSocket
+     ▼
+Express   (API server)
+     │
+     └──▶ Database — PostgreSQL
+```
+
+## 🧰 Tech Stack
+
+- **Language:** TypeScript
+- **Backend:** Express
+- **Frontend:** Next.js, React
+- **Database:** PostgreSQL
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- Docker (optional, for container runs)
+
+### 1. Clone
+
+```bash
+git clone https://github.com/SabarishR08/digital-qr-prescription.git
+cd digital-qr-prescription
+```
+
+### 2. Install dependencies
+
+This is a multi-app monorepo (`client/` + `server/`) — each app installs its own dependencies in the run commands below.
+
+### 3. Configure environment
+
+```bash
+cp .env.example .env   # then fill in values
+```
+
+Environment variables used: `PORT`, `DATABASE_URL`, `JWT_SECRET`, `QR_SIGNING_KEY`, `CORS_ORIGIN`, `NEXT_PUBLIC_API_BASE_URL`.
+
+Most features work without keys; integrations activate when keys are set.
+
+### 4. Run
+
+```bash
+cd backend && npm install && npm run dev   # Terminal 1 — API server
+```
+
+```bash
+cd frontend && npm install && npm run dev   # Terminal 2 — web client
+```
+
+### (Alternative) Run with Docker
+
+```bash
+docker compose up --build
+```
+
+
+---
 
 ![Next.js](https://img.shields.io/badge/Next.js%2014-000?logo=next.js)
 ![React](https://img.shields.io/badge/React%2018-61DAFB?logo=react&logoColor=000)
@@ -300,3 +372,9 @@ Sabarish R
 ---
 
 Origin: Ideathon Hackathon (self-defined problem) — Nov 2024
+
+---
+
+## 📄 License
+
+[MIT](LICENSE) — © 2026 Sabarish R.
