@@ -3,11 +3,11 @@
 ![License](https://img.shields.io/badge/license-MIT-green) ![Language](https://img.shields.io/badge/language-TypeScript-informational) ![Docker](https://img.shields.io/badge/docker-ready-2496ed)
 
 
-## 📌 Overview
+## Overview
 
 A platform for secure, encrypted prescriptions with QR codes, role-based access for doctors, patients, and pharmacists, and a full audit trail.
 
-## 🏗️ Architecture
+## Architecture
 
 ```text
 Next.js, React   (frontend)
@@ -18,14 +18,14 @@ Express   (API server)
      └──▶ Database — PostgreSQL
 ```
 
-## 🧰 Tech Stack
+## Tech Stack
 
 - **Language:** TypeScript
 - **Backend:** Express
 - **Frontend:** Next.js, React
 - **Database:** PostgreSQL
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -210,11 +210,11 @@ npm run dev
 
 ### How QR Signing Works
 
-1. Doctor creates prescription  generates HMAC-SHA256 signature over (prescription_id + expiration_timestamp)
+1. Doctor creates prescription generates HMAC-SHA256 signature over (prescription_id + expiration_timestamp)
 2. Signature embedded in QR code as `qrPayload`
-3. Pharmacy scans QR  backend verifies HMAC signature
-4. If signature invalid or expired  verification fails and is logged
-5. If valid and active  prescription marked REDEEMED, timestamp recorded
+3. Pharmacy scans QR backend verifies HMAC signature
+4. If signature invalid or expired verification fails and is logged
+5. If valid and active prescription marked REDEEMED, timestamp recorded
 
 ### What Gets Logged
 
@@ -375,6 +375,6 @@ Origin: Ideathon Hackathon (self-defined problem) — Nov 2024
 
 ---
 
-## 📄 License
+## License
 
 [MIT](LICENSE) — © 2026 Sabarish R.
